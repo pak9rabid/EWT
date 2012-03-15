@@ -1,5 +1,6 @@
 <?php
-	namespace elwood\page\element;
+	namespace elwood\page;
+	use elwood\page\element\Element;
 	
 	abstract class Page
 	{
