@@ -12,13 +12,7 @@
 		{
 			$this->query = $sql;
 		}
-		
-		// Methods
-		public function execute()
-		{
-			return Database::executeQuery($this);
-		}
-		
+				
 		public function addSql($sql)
 		{
 			$this->query .= $sql;
@@ -61,6 +55,15 @@
 		public function getBindVars()
 		{
 			return $this->bindVars;
+		}
+		
+		public function execute(Database $conn = null)
+		{
+			if (!empty($conn))
+				return $conn->executeQuery($this);
+			
+			$db = Database::getInstance(Database::getConnectionConfig());
+			return $db->executeQuery($this);
 		}
 	}
 ?>

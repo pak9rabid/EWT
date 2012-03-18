@@ -11,7 +11,7 @@
 		protected $conn;
 
 		// Constructors
-		public function __construct($table)
+		public function __construct($table = "")
 		{
 			$this->table = $table;
 		}

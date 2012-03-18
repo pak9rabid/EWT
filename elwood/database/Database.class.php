@@ -64,7 +64,7 @@
 					// line is commented out...skip
 					continue;
 					
-				list($key, $value) = explode("=", $line);
+				@list($key, $value) = explode("=", $line);
 				$config[trim($key)] = trim($value);
 			}
 			
@@ -89,16 +89,26 @@
 		
 		public function executeQuery(DbQueryPreper $prep)
 		{
+			$results = array();
+			
 			try
 			{
 				$stmt = $this->pdo->prepare($prep->getQuery());
 				$stmt->execute($prep->getBindVars());
-				return $stmt->fetchAll(PDO::FETCH_ASSOC);
+				
+				foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row)
+				{
+					$resultHash = new DataHash();
+					$resultHash->setAllAttributes($row);
+					$results[] = $resultHash;
+				}
 			}
 			catch (Exception $ex)
 			{
 				throw new Exception("Error executing SQL query: " . $prep->getQueryDebug());
 			}
+			
+			return $results;
 		}
 		
 		public function executeSelect(DataHash $data, $filterNullValues = false)

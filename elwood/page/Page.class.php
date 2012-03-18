@@ -37,12 +37,10 @@
 			return implode("\n", $out);
 		}
 		
-		abstract public function id();
 		abstract public function name();
 		abstract public function head(array $parameters);
 		abstract public function style(array $parameters);
 		abstract public function content(array $parameters);
-		abstract public function popups(array $parameters);
 		abstract public function isRestricted();
 	}
 ?>
