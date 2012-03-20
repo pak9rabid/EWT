@@ -130,28 +130,7 @@
 			if (!empty($orderBy))
 				$prep->addSql(" ORDER BY " . implode(", ", $orderBy));
 			
-			$result = $this->executeQuery($prep);
-					
-			$resultHashes = array();
-				
-			foreach ($result as $row)
-			{
-				$resultHash = new $classType($data->getTable());
-				
-				if ($filterNullValues)
-				{
-					$resultHash->setAllAttributes(array_filter($row, function($val)
-					{
-						return isset($val);
-					}));
-				}
-				else
-					$resultHash->setAllAttributes($row);
-					
-				$resultHashes[] = $resultHash;
-			}
-				
-			return $resultHashes;
+			return $this->executeQuery($prep);
 		}
 		
 		public static function datahashToParamaterizedWhereClause($key)
