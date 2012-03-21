@@ -37,7 +37,7 @@
 			return implode("\n", $out);
 		}
 		
-		abstract public function name();
+		abstract public function name(array $parameters);
 		abstract public function head(array $parameters);
 		abstract public function style(array $parameters);
 		abstract public function content(array $parameters);
