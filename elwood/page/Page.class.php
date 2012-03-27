@@ -41,6 +41,6 @@
 		abstract public function head(array $parameters);
 		abstract public function style(array $parameters);
 		abstract public function content(array $parameters);
-		abstract public function isRestricted();
+		abstract public function isRestricted(array $parameters);
 	}
 ?>

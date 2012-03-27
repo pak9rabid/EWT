@@ -16,23 +16,31 @@
 		public function addSql($sql)
 		{
 			$this->query .= $sql;
+			
+			return $this;
 		}
 		
 		public function addVariable($bindVar)
 		{
 			$this->query .= "?";
 			$this->bindVars[] = $bindVar;
+			
+			return $this;
 		}
 		
 		public function addVariables(array $bindVars, $delimiter = ",")
 		{
 			$this->query .= implode($delimiter, array_pad(array(), count($bindVars), "?"));
 			$this->addVariablesNoPlaceholder($bindVars);
+			
+			return $this;
 		}
 		
 		public function addVariablesNoPlaceholder(array $bindVars)
 		{
 			$this->bindVars = array_merge($this->bindVars, $bindVars);
+			
+			return $this;
 		}
 		
 		public function getQuery()
