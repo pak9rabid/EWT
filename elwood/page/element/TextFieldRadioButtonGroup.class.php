@@ -1,8 +1,10 @@
 <?php
 	namespace elwood\page\element;
 	
-	class TextFieldRadioButtonGroup extends RadioButtonGroup
+	class TextFieldRadioButtonGroup extends InputElement
 	{
+		protected $options;
+		
 		public function __construct($name = "", array $options = array())
 		{
 			$this->setName($name);			
@@ -11,16 +13,16 @@
 			$this->addClass("elwoodInput");
 		}
 		
-		// Override
+		public function getOptions()
+		{
+			return $this->options;
+		}
+		
 		public function setOptions(array $options)
 		{
 			foreach ($options as $option)
-			{
-				if (!($option instanceof TextField))
-					throw new Exception("Invalid type...must be of type TextField");
-			}
+				$this->addOption($option);
 			
-			$this->options = $options;
 			return $this;
 		}
 		

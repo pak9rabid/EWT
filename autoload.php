@@ -3,7 +3,8 @@
 	
 	spl_autoload_register(function($class)
 	{
-		$classPath = __DIR__ . DIRECTORY_SEPARATOR . str_replace("\\", DIRECTORY_SEPARATOR, $class) . ".class.php";
+		$ds = DIRECTORY_SEPARATOR;
+		$classPath = __DIR__ . $ds . str_replace("\\", $ds, $class) . ".class.php";
 						
 		if (!is_readable($classPath))
 			throw new AutoloadClassException("The class to autoload couldn't be read: $classPath");

@@ -11,7 +11,7 @@
 		protected $pdo;
 		protected $dsn;
 				
-		abstract public function __construct(ConnectionConfig $conig);
+		abstract public function __construct(ConnectionConfig $config);
 		
 		public static function getInstance(ConnectionConfig $config)
 		{
@@ -105,7 +105,11 @@
 			}
 			catch (Exception $ex)
 			{
-				throw new Exception("Error executing SQL query: " . $prep->getQueryDebug());
+				$errorInfo = $this->pdo->errorInfo();
+				$errorCode = $errorInfo[0];
+				$errorMessage = $errorInfo[2];
+				
+				throw new SQLException("Error executing SQL query", $prep->getQueryDebug(), $errorCode, $errorMessage);
 			}
 			
 			return $results;

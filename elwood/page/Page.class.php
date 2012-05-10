@@ -1,11 +1,18 @@
 <?php
 	namespace elwood\page;
+	
 	use elwood\page\element\Element;
 	
 	abstract class Page
 	{
 		protected $elements = array();
 		
+		abstract public function name(array $parameters);
+		abstract public function head(array $parameters);
+		abstract public function style(array $parameters);
+		abstract public function content(array $parameters);
+		abstract public function isRestricted(array $parameters);
+				
 		public function addElement(Element $element)
 		{
 			$this->elements[$element->getName()] = $element;
@@ -36,11 +43,5 @@
 			
 			return implode("\n", $out);
 		}
-		
-		abstract public function name(array $parameters);
-		abstract public function head(array $parameters);
-		abstract public function style(array $parameters);
-		abstract public function content(array $parameters);
-		abstract public function isRestricted(array $parameters);
 	}
 ?>

@@ -3,40 +3,40 @@
 	
 	class AjaxResponse
 	{
-		protected $responseText;
+		protected $data;
 		protected $errors = array();
-		
-		public function __construct($responseText = "", array $errors = array())
+	
+		public function __construct($data = "", array $errors = array())
 		{
-			$this->responseText = $responseText;
+			$this->data = $data;
 			$this->errors = $errors;
 		}
-		
+	
 		public function hasErrors()
 		{
 			return count($this->errors) > 0;
 		}
-		
+	
 		public function getResponseText()
 		{
-			return $this->responseText;
+			return $this->data;
 		}
-		
+	
 		public function setErrors(array $errors)
 		{
 			$this->errors = $errors;
 		}
-		
-		public function setResponseText($responseText)
+	
+		public function setData($data)
 		{
-			$this->responseText = $responseText;
+			$this->data = $data;
 		}
-		
+	
 		public function toJson()
 		{
 			foreach ($this as $key => $value)
 				@$json->$key = $value;
-				
+	
 			return json_encode($json);
 		}
 	}
