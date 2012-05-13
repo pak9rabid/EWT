@@ -32,6 +32,6 @@
 		if (!is_readable($classPath))
 			throw new AutoloadClassException("The class to autoload couldn't be read: $classPath");
 		
-		require_once $classPath;
+		include $classPath;
 	});
 ?>

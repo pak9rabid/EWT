@@ -27,6 +27,6 @@
 	interface AjaxRequestHandler
 	{
 		public function processRequest(array $parameters);
-		public function isRestricted();
+		public function isRestricted(array $parameters);
 	}
 ?>
