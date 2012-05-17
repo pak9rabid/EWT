@@ -30,6 +30,7 @@
 	{		
 		const SUPPORTED_DATABASE_TYPES = "mysql,oci,pgsql,sqlite";
 		const CONNECTION_CONFIG_FILE = "db.cfg";
+		const MAX_IDENTIFIER_LENGTH = 128;
 		
 		protected $pdo;
 		protected $dsn;
@@ -125,6 +126,7 @@
 		public function executeQuery(DbQueryPreper $prep)
 		{
 			$results = array();
+			$table = $prep->getTable();
 			
 			try
 			{
@@ -134,6 +136,10 @@
 				foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row)
 				{
 					$resultHash = new DataHash();
+					
+					if (!empty($table))
+						$resultHash->setTable($table);
+					
 					$resultHash->setAllAttributes($row);
 					$results[] = $resultHash;
 				}
@@ -152,10 +158,9 @@
 		
 		public function executeSelect(DataHash $data, $filterNullValues = false)
 		{
-			$classType = get_class($data);
-			
 			// Select rows from the database
 			$prep = new DbQueryPreper("SELECT * FROM " . $data->getTable());
+			$prep->setTable($data->getTable());
 			
 			if (count($data->getAttributeKeys()) > 0)
 			{
@@ -181,6 +186,7 @@
 		{
 			// Insert new row into the database
 			$prep = new DbQueryPreper("INSERT INTO " . $data->getTable() . " (");
+			$prep->setTable($data->getTable());
 			$prep->addSql(implode(",", $data->getAttributeKeys()) . ") VALUES (");
 			$prep->addVariables($data->getAttributeValues());
 			$prep->addSql(")");			
@@ -220,6 +226,7 @@
 				throw new Exception("Primary key not specified and/or set");
 
 			$prep = new DbQueryPreper("UPDATE " . $data->getTable() . " SET");
+			$prep->setTable($data->getTable());
 			
 			foreach ($data->getAttributeMap() as $key => $value)
 			{
@@ -242,6 +249,7 @@
 		{
 			// Deletes rows from the database based on the criteria specified in $data
 			$prep = new DbQueryPreper("DELETE FROM " . $data->getTable());
+			$prep->setTable($data->getTable());
 			
 			if (count($data->getAttributeKeys()) > 0)
 			{

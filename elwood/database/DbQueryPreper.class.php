@@ -24,11 +24,14 @@
 
 	namespace elwood\database;
 	
+	use Exception;
+	
 	class DbQueryPreper
 	{
 		// Attribute
 		protected $query;
 		protected $bindVars = array();
+		protected $table;
 		
 		// Constructors
 		public function __construct($sql)
@@ -95,6 +98,19 @@
 			
 			$db = Database::getInstance(Database::getConnectionConfig());
 			return $db->executeQuery($this);
+		}
+		
+		public function setTable($table)
+		{
+			if (!Database::isValidIdentifier($table))
+				throw new Exception("Invalid table name specified");
+			
+			$this->table = $table;
+		}
+		
+		public function getTable()
+		{
+			return $this->table;
 		}
 	}
 ?>
