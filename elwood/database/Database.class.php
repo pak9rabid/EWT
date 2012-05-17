@@ -110,6 +110,18 @@
 			return true;
 		}
 		
+		public static function isValidIdentifier($identifier)
+		{
+			// database identifiers are names given to various named objects (tables, columns, constraints, indexes, etc)
+			if (strlen($identifier) > self::MAX_IDENTIFIER_LENGTH)
+				return false;
+		
+			if (!preg_match("/^[A-Za-z]{1}[A-Za-z0-9|_]*$/", $identifier))
+				return false;
+		
+			return true;
+		}
+		
 		public function executeQuery(DbQueryPreper $prep)
 		{
 			$results = array();
