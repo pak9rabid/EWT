@@ -23,6 +23,7 @@
  */
 
 	namespace elwood\database;
+	
 	use Exception;
 	use PDO;
 	

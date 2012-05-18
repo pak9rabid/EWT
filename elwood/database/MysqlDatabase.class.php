@@ -23,6 +23,8 @@
  */
 
 	namespace elwood\database;
+	
+	use Exception;
 	use PDO;
 	
 	class MysqlDatabase extends Database
@@ -36,6 +38,30 @@
 			
 			$this->dsn = "mysql:host=" . $config->getHost() . ";port=" . $port . ";dbname=" . $config->getDatabase();
 			$this->pdo = new PDO($this->dsn, $config->getUsername(), $config->getPassword(), array(PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8"));
+		}
+		
+		// Override
+		public function executeQuery(DbQueryPreper $prep)
+		{
+			if (preg_match("/^SELECT/i", $prep->getQuery()))
+				return parent::executeQuery($prep);
+			
+			// the MySQL PDO implementation throws a fit when $stmt->fetchAll()
+			//is called on any prepared statement that isn't a select, so we'll
+			// work around it
+			try
+			{
+				$stmt = $this->pdo->prepare($prep->getQuery());
+				$stmt->execute($prep->getBindVars());
+			}
+			catch (Exception $ex)
+			{
+				$errorInfo = $this->pdo->errorInfo();
+				$errorCode = $errorInfo[0];
+				$errorMessage = $errorInfo[2];
+				
+				throw new SQLException("Error executing SQL query", $prep->getQueryDebug(), $errorCode, $errorMessage);
+			}
 		}
 	}
 ?>
