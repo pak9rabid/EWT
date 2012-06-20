@@ -124,7 +124,54 @@
 			return true;
 		}
 		
-		public function executeQuery(DbQueryPreper $prep)
+		public static function datahashToParamaterizedWhereClause(DataHash $data, DbQueryPreper $prep = null)
+		{
+			$conditions = array();
+			$likeConditions = array();
+			$conditionValues = array();
+			$likeConditionValues = array();
+		
+			foreach ($data->getComparatorMap() as $attribute => $comparator)
+			{
+				if (in_array($comparator, array("=", "!=", ">", "<", ">=", "<=")))
+				{
+					$conditions[] = " $attribute $comparator ? ";
+					$conditionValues[] = $data->getAttribute($attribute);
+				}
+				else
+				{
+					$likeConditions[] = " $attribute LIKE ? ";
+		
+					switch ($comparator)
+					{
+		
+						case "*?*":
+							$likeConditionValues[] = "%" . $data->getAttribute($attribute) . "%";
+							break;
+		
+						case "*?":
+							$likeConditionValues[] = "%" . $data->getAttribute($attribute);
+							break;
+		
+						case "?*":
+							$likeConditionValues[] = $data->getAttribute($attribute) . "%";
+							break;
+					}
+				}
+			}
+		
+			$sql = implode(" AND ", array_merge($conditions, $likeConditions));
+		
+			if ($prep != null)
+			{
+				$prep->addSql($sql);
+				$prep->addVariablesNoPlaceholder(array_merge($conditionValues, $likeConditionValues));
+			}
+		
+			return $sql;
+		}
+		
+		public function executeQuery(DbQueryPreper $prep, $getNumRowsAffected = false)
 		{
 			$results = array();
 			$table = $prep->getTable();
@@ -133,6 +180,9 @@
 			{
 				$stmt = $this->pdo->prepare($prep->getQuery());
 				$stmt->execute($prep->getBindVars());
+				
+				if ($getNumRowsAffected)
+					return $stmt->rowCount();
 				
 				foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row)
 				{
@@ -166,8 +216,7 @@
 			if (count($data->getAttributeKeys()) > 0)
 			{
 				$prep->addSql(" WHERE ");
-				$prep->addSql(implode(" AND ", array_map(array("self", "datahashToParamaterizedWhereClause"), $data->getAttributeKeys())));
-				$prep->addVariablesNoPlaceholder($data->getAttributeValues());
+				self::datahashToParamaterizedWhereClause($data, $prep);
 			}
 			
 			$orderBy = $data->getOrderBy();
@@ -178,10 +227,7 @@
 			return $this->executeQuery($prep);
 		}
 		
-		public static function datahashToParamaterizedWhereClause($key)
-		{
-			return " $key = ? ";
-		}
+
 
 		public function executeInsert(DataHash $data)
 		{
@@ -246,7 +292,7 @@
 			$this->executeQuery($prep);
 		}
 
-		public function executeDelete(DataHash $data, $isTemp = false)
+		public function executeDelete(DataHash $data)
 		{
 			// Deletes rows from the database based on the criteria specified in $data
 			$prep = new DbQueryPreper("DELETE FROM " . $data->getTable());
@@ -255,11 +301,10 @@
 			if (count($data->getAttributeKeys()) > 0)
 			{
 				$prep->addSql(" WHERE ");
-				$prep->addSql(implode(" AND ", array_map(array("self", "datahashToParamaterizedWhereClause"), $data->getAttributeKeys())));
-				$prep->addVariablesNoPlaceHolder($data->getAttributeValues());
+				self::datahashToParamaterizedWhereClause($data, $prep);
 			}
 						
-			$this->executeQuery($prep);
+			return $this->executeQuery($prep, true);
 		}
 		
 		public function getPdo()

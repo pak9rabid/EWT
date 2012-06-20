@@ -23,6 +23,8 @@
  */
 
 	namespace elwood\database;
+	
+	use Exception;
 
 	class DataHash
 	{
@@ -31,7 +33,13 @@
 		protected $primaryKey = "id";
 		protected $orderBy = array();
 		protected $hashMap = array();
+		protected $comparatorMap = array();
 		protected $conn;
+				
+		public static function isValidComparator($comparator)
+		{
+			return in_array($comparator, array("=", "!=", ">", "<", ">=", "<=", "*?*", "*?", "?*"));
+		}
 
 		// Constructors
 		public function __construct($table = "")
@@ -42,12 +50,7 @@
 		// Methods
 		public function __toString()
 		{
-			$elements = array();
-
-			foreach ($this->hashMap as $key => $value)
-				$elements[] = "$key=$value";
-
-			return "{" . implode(", ", $elements) . "}";
+			return "{" . implode(", ", array_map(function($key, $value){return "$key = $value";}, array_keys($this->hashMap), array_values($this->hashMap))) . "}";	
 		}
 		
 		public function toJson()
@@ -58,11 +61,13 @@
 		public function setConnection(Database $conn)
 		{
 			$this->conn = $conn;
+			return $this;
 		}
 
 		public function setTable($table)
 		{
 			$this->table = $table;
+			return $this;
 		}
 
 		public function getTable()
@@ -73,11 +78,13 @@
 		public function setPrimaryKey($primaryKey)
 		{
 			$this->primaryKey = $primaryKey;
+			return $this;
 		}
 		
 		public function setOrderBy(array $orderByList)
 		{			
 			$this->orderBy = $orderByList;
+			return $this;
 		}
 		
 		public function getOrderBy()
@@ -92,10 +99,7 @@
 
 		public function getAttribute($key)
 		{
-			if (isset($this->hashMap[$key]))
-				return $this->hashMap[$key];
-				
-			return null;
+			return isset($this->hashMap[$key]) ? $this->hashMap[$key] : null;
 		}
 
 		public function getAttributeMap()
@@ -113,24 +117,39 @@
 			return array_values($this->hashMap);
 		}
 
-		public function setAttribute($key, $value)
+		public function setAttribute($key, $value, $comparator = "=")
 		{
 			$this->hashMap[$key] = $value;
+			$this->setComparator($key, $comparator);
+			return $this;
 		}
 
-		public function setAllAttributes($hashMap)
+		public function setAllAttributes(array $hashMap)
 		{
 			$this->hashMap = $hashMap;
+			
+			if (empty($hashMap))
+				$this->clearComparators();
+			else
+			{
+				foreach ($this->hashMap as $key => $value)
+					$this->setComparator($key, "=");
+			}
+			
+			return $this;
 		}
 
 		public function removeAttribute($key)
 		{
 			unset($this->hashMap[$key]);
+			return $this;
 		}
 
 		public function clear()
 		{
 			$this->hashMap = array();
+			$this->clearComparators();
+			return $this;
 		}
 		
 		public function executeSelect($filterNullValues = false)
@@ -153,6 +172,8 @@
 				$db = Database::getInstance(Database::getConnectionConfig());
 				$db->executeInsert($this);
 			}
+			
+			return $this;
 		}
 
 		public function executeUpdate()
@@ -164,22 +185,68 @@
 				$db = Database::getInstance(Database::getConnectionConfig());
 				$db->executeUpdate($this);
 			}
+			
+			return $this;
 		}
 
 		public function executeDelete()
 		{			
 			if (!empty($this->conn))
-				$this->conn->executeDelete($this);
+				return $this->conn->executeDelete($this);
 			else
 			{
 				$db = Database::getInstance(Database::getConnectionConfig());
-				$db->executeDelete($this);
+				return $db->executeDelete($this);
 			}
 		}
 		
 		public function getAttributeDisp($attribute)
 		{
 			return $this->getAttribute($attribute) == null ? "*" : $this->getAttribute($attribute);
+		}
+		
+		public function setComparator($attribute, $comparator)
+		{
+			if (!self::isValidComparator($comparator))
+				throw new Exception("Invalid comparator specified");
+			
+			if (!in_array($attribute, array_keys($this->hashMap)))
+				throw new Exception("Invalid attribute specified to apply comparator to");
+			
+			$this->comparatorMap[$attribute] = $comparator;
+			
+			return $this;
+		}
+		
+		public function getComparator($attribute)
+		{
+			return isset($this->comparatorMap[$attribute]) ? $this->comparatorMap[$attribute] : null;
+		}
+		
+		public function getComparatorMap()
+		{
+			return $this->comparatorMap;
+		}
+		
+		public function getComparatorKeys()
+		{
+			return array_keys($this->comparatorMap);
+		}
+		
+		public function getComparatorValues()
+		{
+			return array_values($this->comparatorMap);
+		}
+		
+		public function clearComparators()
+		{
+			// resets all attribute comparators back to '='
+			$this->comparatorMap = array();
+			
+			foreach ($this->getAttributeKeys() as $key)
+				$this->setComparator($key, "=");
+			
+			return $this;
 		}
 	}
 ?>
