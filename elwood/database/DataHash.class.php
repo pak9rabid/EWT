@@ -50,7 +50,23 @@
 		// Methods
 		public function __toString()
 		{
-			return "{" . implode(", ", array_map(function($key, $value){return "$key = $value";}, array_keys($this->hashMap), array_values($this->hashMap))) . "}";	
+			$dh = $this;
+			
+			return	"{" .
+						implode
+						(", ",
+							array_map
+							(
+								// closures ftw
+								function($key, $value) use ($dh)
+								{
+									return "$key " . $dh->getComparator($key) . " $value";
+								},
+								array_keys($this->hashMap),
+								array_values($this->hashMap)
+							)
+						) .
+					"}";
 		}
 		
 		public function toJson()
@@ -132,8 +148,12 @@
 				$this->clearComparators();
 			else
 			{
-				foreach ($this->hashMap as $key => $value)
-					$this->setComparator($key, "=");
+				$dh = $this;
+				
+				array_walk($this->hashMap, function($value, $key) use ($dh)
+				{
+					$dh->setComparator($key, "=");
+				});
 			}
 			
 			return $this;
@@ -242,9 +262,12 @@
 		{
 			// resets all attribute comparators back to '='
 			$this->comparatorMap = array();
+			$dh = $this;
 			
-			foreach ($this->getAttributeKeys() as $key)
-				$this->setComparator($key, "=");
+			array_walk($this->hashMap, function($value, $key) use ($dh)
+			{
+				$dh->setComparator($key, "=");
+			});
 			
 			return $this;
 		}
