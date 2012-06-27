@@ -29,8 +29,8 @@
 	class DataHash
 	{
 		// Attributes
-		protected $table = "";
 		protected $primaryKey = "id";
+		protected $tables = array();
 		protected $orderBy = array();
 		protected $hashMap = array();
 		protected $comparatorMap = array();
@@ -42,9 +42,12 @@
 		}
 
 		// Constructors
-		public function __construct($table = "")
+		public function __construct($tables = "")
 		{
-			$this->table = $table;
+			if (gettype($tables) == "array")
+				$this->setTables($tables);
+			else
+				$this->setTable($tables);
 		}
 
 		// Methods
@@ -79,16 +82,59 @@
 			$this->conn = $conn;
 			return $this;
 		}
-
+		
 		public function setTable($table)
 		{
-			$this->table = $table;
+			$this->setTables(array($table));
+		}
+		
+		public function setTables(array $tables)
+		{
+			if (empty($tables))
+				throw new Exception("No table(s) specified");
+			
+			$tablesBackup = $this->tables;
+			
+			$this->tables = array();
+			
+			array_walk($tables, function($table, $key, DataHash $dh) use ($tablesBackup)
+			{
+				try
+				{
+					$dh->addTable($table);
+				}
+				catch (Exception $ex)
+				{
+					$dh->setTables($tablesBackup);
+					throw $ex;
+				}
+			}, $this);
+			
 			return $this;
 		}
-
-		public function getTable()
+		
+		public function addTable($table)
 		{
-			return $this->table;
+			if (!Database::isValidIdentifier($table))
+				throw new Exception("Invalid table name specified");
+			
+			$this->tables[] = $table;
+			return $this;
+		}
+		
+		public function removeTable($removeTable)
+		{
+			$this->setTables(array_filter($this->getTables(), function($table) use ($removeTable)
+			{
+				return $table != $removeTable;
+			}));
+			
+			return $this;
+		}
+		
+		public function getTables()
+		{
+			return $this->tables;
 		}
 
 		public function setPrimaryKey($primaryKey)
@@ -147,13 +193,11 @@
 			if (empty($hashMap))
 				$this->clearComparators();
 			else
-			{
-				$dh = $this;
-				
-				array_walk($this->hashMap, function($value, $key) use ($dh)
+			{				
+				array_walk($this->hashMap, function($value, $key, DataHash $dh)
 				{
 					$dh->setComparator($key, "=");
-				});
+				}, $this);
 			}
 			
 			return $this;
@@ -262,12 +306,11 @@
 		{
 			// resets all attribute comparators back to '='
 			$this->comparatorMap = array();
-			$dh = $this;
 			
-			array_walk($this->hashMap, function($value, $key) use ($dh)
+			array_walk($this->hashMap, function($value, $key, DataHash $dh)
 			{
 				$dh->setComparator($key, "=");
-			});
+			}, $this);
 			
 			return $this;
 		}
