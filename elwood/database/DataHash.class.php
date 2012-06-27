@@ -86,6 +86,7 @@
 		public function setTable($table)
 		{
 			$this->setTables(array($table));
+			return $this;
 		}
 		
 		public function setTables(array $tables)
@@ -93,23 +94,13 @@
 			if (empty($tables))
 				throw new Exception("No table(s) specified");
 			
-			$tablesBackup = $this->tables;
-			
-			$this->tables = array();
-			
-			array_walk($tables, function($table, $key, DataHash $dh) use ($tablesBackup)
+			array_walk($tables, function($table, $key)
 			{
-				try
-				{
-					$dh->addTable($table);
-				}
-				catch (Exception $ex)
-				{
-					$dh->setTables($tablesBackup);
-					throw $ex;
-				}
-			}, $this);
+				if (!Database::isValidIdentifier($table))
+					throw new Exception("Invalid table name specified");
+			});
 			
+			$this->tables = $tables;
 			return $this;
 		}
 		
@@ -118,7 +109,21 @@
 			if (!Database::isValidIdentifier($table))
 				throw new Exception("Invalid table name specified");
 			
+			if (in_array($table, $this->getTables()))
+				throw new Exception("The specified table already exists");
+			
 			$this->tables[] = $table;
+			return $this;
+		}
+		
+		public function addTables(array $tables)
+		{
+			$result = array_intersect($tables, $this->getTables());
+			
+			if (!empty($result))
+				throw new Exception("One or more of the tables specified already exists");
+			
+			$this->setTables(array_merge($this->getTables(), $tables));
 			return $this;
 		}
 		
@@ -264,21 +269,15 @@
 			}
 		}
 		
-		public function getAttributeDisp($attribute)
-		{
-			return $this->getAttribute($attribute) == null ? "*" : $this->getAttribute($attribute);
-		}
-		
 		public function setComparator($attribute, $comparator)
 		{
 			if (!self::isValidComparator($comparator))
 				throw new Exception("Invalid comparator specified");
 			
-			if (!in_array($attribute, array_keys($this->hashMap)))
+			if (!in_array($attribute, $this->getAttributeKeys()))
 				throw new Exception("Invalid attribute specified to apply comparator to");
 			
 			$this->comparatorMap[$attribute] = $comparator;
-			
 			return $this;
 		}
 		
