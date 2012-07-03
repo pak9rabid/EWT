@@ -72,7 +72,7 @@
 											}, $attributes, $dm->getAttributeKeys($table))
 										) . 
 									"]";
-							}, &$this->attributes, $this->getTables())
+							}, $this->attributes, $this->getTables())
 						) .
 					"}";
 		}
@@ -143,7 +143,7 @@
 		public function removeTable($table)
 		{
 			if (count($this->getTables()) == 1)
-				throw new Exception("Unable to remove the last table: " . $table);
+				throw new Exception("Unable to remove the last remaining table: " . $table);
 			
 			unset($this->attributes[$table]);
 			return $this;
@@ -214,6 +214,9 @@
 		
 		public function getAttribute($name, $table = "")
 		{
+			if (empty($name))
+				return null;
+			
 			$table = $this->getExistingTable($table);
 			return isset($this->attributes[$table][$name]) ? $this->attributes[$table][$name]->value : null;
 		}
@@ -239,7 +242,7 @@
 			if (!empty($table))
 			{
 				if (!isset($table, $this->attributes[$table]))
-					throw new Exception("The table specified does not exist: " . $table);
+					return array();
 				
 				$f($this->attributes[$table], $table, $returnAttributes);
 				return $returnAttributes;
@@ -382,10 +385,13 @@
 		
 		public function getComparator($attribute, $table = "")
 		{
+			if (empty($attribute))
+				return null;
+			
 			$table = $this->getExistingTable($table);
 			
 			if (!isset($this->attributes[$table][$attribute]))
-				throw new Exception("The attribute specified does not exist: " . $table . "." . $attribute);
+				return null;
 			
 			return $this->attributes[$table][$attribute]->comparator;
 		}
@@ -400,26 +406,26 @@
 			if (!empty($table))
 			{
 				if (!isset($this->attributes[$table]))
-					throw new Exception("The table specified does not exist: " . $table);
+					return array();
 				
-				$comparators = array_map($f, &$this->attributes[$table]);
+				$comparators = array_map($f, $this->attributes[$table]);
 				
 				return array_combine(array_map(function($key) use ($table)
 				{
 					return $table . "." . $key;
-				}, array_keys(&$comparators)), &$comparators);
+				}, array_keys($comparators)), $comparators);
 			}
 			
 			$allComparators = array();
 			
 			array_walk($this->attributes, function(array $attributes, $table, $allComparators) use ($f)
-			{	
-				$tableComparators = array_map($f, &$attributes);
+			{
+				$tableComparators = array_map($f, $attributes);
 				
 				$tableComparators = array_combine(array_map(function($key) use ($table)
 				{
 					return $table . "." . $key;
-				}, array_keys(&$tableComparators)), &$tableComparators);
+				}, array_keys($tableComparators)), $tableComparators);
 				
 				$allComparators = array_merge($allComparators, $tableComparators);
 			}, &$allComparators);
@@ -461,7 +467,7 @@
 			array_walk($params = array("\$table1" => $table1, "\$attribute1" => $attribute1, "\$table2" => $table2, "\$attribute2" => $attribute2), function($value, $key)
 			{
 				if (empty($value))
-					throw new Exception("Required paramter missing: " . $key);
+					throw new Exception("Required parameter missing: " . $key);
 				
 				if (!Database::isValidIdentifier($value))
 					throw new Exception("The identifier specified is invalid: " . $value);
@@ -491,7 +497,7 @@
 				if (count($tables) == 1)
 					$table = $tables[0];
 				else
-					throw new Exception("Table must be specified");
+					throw new Exception("Multiple tables present...table must be specified");
 			}
 			else
 			{
