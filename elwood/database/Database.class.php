@@ -28,7 +28,7 @@
 	use PDO;
 	
 	abstract class Database
-	{		
+	{
 		const SUPPORTED_DATABASE_TYPES = "mysql,oci,pgsql,sqlite";
 		const CONNECTION_CONFIG_FILE = "db.cfg";
 		const MAX_IDENTIFIER_LENGTH = 128;
@@ -124,57 +124,62 @@
 			return true;
 		}
 		
-		public static function datahashToParamaterizedWhereClause(DataHash $data, DbQueryPreper $prep = null)
+		public function dataModelToParamaterizedWhereClause(DataModel $dm, DbQueryPreper $prep = null)
 		{
 			$conditions = array();
 			$likeConditions = array();
 			$conditionValues = array();
 			$likeConditionValues = array();
-		
-			foreach ($data->getComparatorMap() as $attribute => $comparator)
+			
+			foreach ($dm->getAttributes() as $attributeName => $attributeValue)
 			{
+				list($table, $attributeName) = explode(".", $attributeName);
+				$comparator = $dm->getComparator($attributeName, $table);
+				
 				if (in_array($comparator, array("=", "!=", ">", "<", ">=", "<=")))
 				{
-					$conditions[] = " $attribute $comparator ? ";
-					$conditionValues[] = $data->getAttribute($attribute);
+					$conditions[] = " $table.$attributeName $comparator ? ";
+					$conditionValues[] = $attributeValue;
 				}
 				else
 				{
-					$likeConditions[] = " $attribute LIKE ? ";
-		
+					$likeConditions[] = " $table.$attributeName LIKE ? ";
+					
 					switch ($comparator)
 					{
-		
 						case "*?*":
-							$likeConditionValues[] = "%" . $data->getAttribute($attribute) . "%";
+							$likeConditionValues[] = "%" . $attributeValue . "%";
 							break;
-		
+							
 						case "*?":
-							$likeConditionValues[] = "%" . $data->getAttribute($attribute);
+							$likeConditionValues[] = "%" . $attributeValue;
 							break;
-		
+							
 						case "?*":
-							$likeConditionValues[] = $data->getAttribute($attribute) . "%";
-							break;
+							$likeConditionValues[] = $attributeValue . "%";
 					}
 				}
 			}
-		
-			$sql = implode(" AND ", array_merge($conditions, $likeConditions));
-		
+			
+			$conditions = array_merge($dm->getTableRelationships(), $conditions, $likeConditions);
+			
+			if (empty($conditions))
+				return "";
+			
+			$sql = " WHERE " . implode(" AND ", $conditions);
+			
 			if ($prep != null)
 			{
 				$prep->addSql($sql);
 				$prep->addVariablesNoPlaceholder(array_merge($conditionValues, $likeConditionValues));
 			}
-		
+			
 			return $sql;
 		}
 		
 		public function executeQuery(DbQueryPreper $prep, $getNumRowsAffected = false)
 		{
 			$results = array();
-			$table = $prep->getTable();
 			
 			try
 			{
@@ -184,16 +189,25 @@
 				if ($getNumRowsAffected)
 					return $stmt->rowCount();
 				
-				foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row)
+				return array_map(function($row)
 				{
-					$resultHash = new DataHash();
+					$normalizedRow = array();
 					
-					if (!empty($table))
-						$resultHash->setTable($table);
+					array_walk($row, function($value, $attribute, array $normalizedRow)
+					{
+						$parts = explode(".", $attribute);
+						
+						if (count($parts) < 2)
+							$attribute = "unknown_table." . $attribute;
+						
+						$normalizedRow[$attribute] = $value;
+					}, &$normalizedRow);
 					
-					$resultHash->setAllAttributes($row);
-					$results[] = $resultHash;
-				}
+					$dm = new DataModel();
+					$dm->setAllAttributes($normalizedRow);
+					return $dm;
+					
+				}, $stmt->fetchAll(PDO::FETCH_ASSOC));				
 			}
 			catch (Exception $ex)
 			{
@@ -201,35 +215,41 @@
 				$errorCode = $errorInfo[0];
 				$errorMessage = $errorInfo[2];
 				
-				throw new SQLException("Error executing SQL query", $prep->getQueryDebug(), $errorCode, $errorMessage);
+				throw new SQLException("Error executing SQL Query", $prep->getQueryDebug(), $errorCode, $errorMessage);
 			}
-			
-			return $results;
 		}
 		
-		public function executeSelect(DataHash $data, $filterNullValues = false)
+		public function executeSelect(DataModel $dm, $filterNullValues = false)
 		{
-			// Select rows from the database
-			$prep = new DbQueryPreper("SELECT * FROM " . $data->getTable());
-			$prep->setTable($data->getTable());
+			$tables = $dm->getTables();
 			
-			if (count($data->getAttributeKeys()) > 0)
+			if (empty($tables))
+				throw new Exception("No table(s) specified");
+			
+			$selectAttributes = $dm->getSelectAttributes();
+			
+			if (empty($selectAttributes))
+				throw new Exception("No select attribute(s) specified");
+			
+			$prep = new DbQueryPreper("SELECT " . implode(", ", array_map(function($selectAttribute)
 			{
-				$prep->addSql(" WHERE ");
-				self::datahashToParamaterizedWhereClause($data, $prep);
+				list($table, $attribute) = explode(".", $selectAttribute);
+				return $selectAttribute . " AS \"" . $table . "." . $attribute . "\"";
+			}, $dm->getSelectAttributes())) . " FROM " . implode(", ", $tables));
+			
+			$this->dataModelToParamaterizedWhereClause($dm, $prep);
+			$order = $dm->getOrder();
+			
+			if (!empty($order))
+			{
+				$prep->addSql(" ORDER BY " . implode(", ", $order));
+				$prep->addSql(" " . $dm->getOrderDirection());
 			}
-			
-			$orderBy = $data->getOrderBy();
-			
-			if (!empty($orderBy))
-				$prep->addSql(" ORDER BY " . implode(", ", $orderBy));
 			
 			return $this->executeQuery($prep);
 		}
 		
-
-
-		public function executeInsert(DataHash $data)
+		public function executeInsert(DataModel $data)
 		{
 			// Insert new row into the database
 			$prep = new DbQueryPreper("INSERT INTO " . $data->getTable() . " (");
@@ -248,8 +268,8 @@
 			{
 				foreach ($data as $row)
 				{
-					if (!($row instanceof DataHash))
-						throw new Exception("Invalid type: must be of type DataHash");
+					if (!($row instanceof DataModel))
+						throw new Exception("Invalid type: must be of type DataModel");
 						
 					$this->executeInsert($row);
 				}
@@ -263,7 +283,7 @@
 			$this->pdo->commit();
 		}
 
-		public function executeUpdate(DataHash $data)
+		public function executeUpdate(DataModel $data)
 		{
 			// Update row in the database
 			$primaryKey = $data->getPrimaryKey();
@@ -292,7 +312,7 @@
 			$this->executeQuery($prep);
 		}
 
-		public function executeDelete(DataHash $data)
+		public function executeDelete(DataModel $data)
 		{
 			// Deletes rows from the database based on the criteria specified in $data
 			$prep = new DbQueryPreper("DELETE FROM " . $data->getTable());
