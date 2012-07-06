@@ -274,6 +274,7 @@
 
 		public function setAttributes(array $attributes, $table = "")
 		{
+			// sets attributes for $table
 			$backup = $this->attributes;
 			
 			try
@@ -288,6 +289,39 @@
 				$this->attributes = $backup;
 				throw $ex;
 			}
+			
+			return $this;
+		}
+		
+		public function setAllAttributes(array $attributes)
+		{
+			/** replaces all existing tables & attributes with what's specified
+			 *  in $attributes, creating new tables as needed.  $attributes is
+			 *  expected to be an associative array in the following form:
+			 *  $attributes[<table>.<attribute>] = <value>
+			 */
+			$this->clear();
+			
+			array_walk($attributes, function($value, $attribute, DataModel $dm)
+			{
+				$parts = explode(".", $attribute);
+
+				if (count($parts) != 2)
+					throw new Exception("Invalid fully-qualified attribute name specified: " . $attribute);
+				
+				list($table, $attribute) = $parts;
+				
+				if (!Database::isValidIdentifier($table))
+					throw new Exception("Invalid table name specified: " . $table);
+				
+				if (!Database::isValidIdentifier($attribute))
+					throw new Exception("Invalid attribute name specified: " . $attribute);
+				
+				if (!in_array($table, $dm->getTables()))
+					$dm->setTable($table);
+				
+				$dm->setAttribute($attribute, $value, $table);
+			}, $this);
 			
 			return $this;
 		}
