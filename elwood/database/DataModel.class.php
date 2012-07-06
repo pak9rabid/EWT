@@ -33,6 +33,7 @@
 		protected $attributes = array();
 		protected $order = array();
 		protected $tableRelationships = array();
+		protected $selectAttributes = array();
 		protected $orderDirection = "ASC";
 		protected $db;
 		
@@ -44,10 +45,13 @@
 		// constructor
 		public function __construct($tables = "")
 		{
-			if (gettype($tables) == "array")
-				$this->setTables($tables);
-			else
-				$this->setTable($tables);
+			if (!empty($tables))
+			{
+				if (gettype($tables) == "array")
+					$this->setTables($tables);
+				else
+					$this->setTable($tables);
+			}
 		}
 
 		// methods
@@ -93,59 +97,56 @@
 			if (!Database::isValidIdentifier($table))
 				throw new Exception("Invalid table name specified: " . $table);
 			
-			$this->attributes[$table] = array();
+			$this->attributes[strtolower($table)] = array();
 			return $this;
 		}
 		
 		public function setTables(array $tables)
 		{
-			if (empty($tables))
-				throw new Exception("At least on table must be specified");
+			$backup = $this->attributes;
+			$this->clear();
 			
-			$attributes = array();
-			
-			array_walk($tables, function($table, $key, array $attributes)
+			try
 			{
-				if (!Database::isValidIdentifier($table))
-					throw new Exception("Invalid table name specified: " . $table);
-				
-				$attributes[$table] = array();
-			}, &$attributes);
-			
-			$this->attributes = $attributes;
-			return $this;
-		}
-		
-		public function addTable($table)
-		{
-			if (isset($this->attributes[$table]))
-				throw new Exception("The table specified already exists: " . $table);
-			
-			$this->setTable($table);
-			return $this;
-		}
-		
-		public function addTables(array $tables)
-		{
-			$conflicts = array_intersect($tables, $this->getTables());
-			
-			if (!empty($conflicts))
-				throw new Exception("The table(s) specified already exist: " . implode(", ", $conflicts));
-			
-			array_walk($tables, function($table, $key, DataModel $dm)
+				array_walk($tables, function($table, $key, DataModel $dm)
+				{
+					$dm->setTable($table);
+				}, $this);
+			}
+			catch (Exception $ex)
 			{
-				$dm->addTable($table);
-			}, $this);
+				$this->attributes = $backup;
+				throw $ex;
+			}
 			
 			return $this;
 		}
-		
+			
 		public function removeTable($table)
-		{
-			if (count($this->getTables()) == 1)
-				throw new Exception("Unable to remove the last remaining table: " . $table);
+		{			
+			unset($this->attributes[strtolower($table)]);
 			
-			unset($this->attributes[$table]);
+			$this->tableRelationships = array_filter($this->tableRelationships, function($relationship) use ($table)
+			{
+				$attributes = explode(" = ", $relationship);
+				list($table1, $attribute1) = explode(".", $attributes[0]); 
+				list($table2, $attribute2) = explode(".", $attributes[1]);
+				
+				return !in_array($table, array($table1, $table2));
+			});
+			
+			$this->order = array_filter($this->order, function($order) use ($table)
+			{
+				list($orderTable, $attribute) = explode(".", $order);
+				return $orderTable != $table;
+			});
+			
+			$this->selectAttributes = array_filter($this->selectAttributes, function($selectAttribute) use ($table)
+			{
+				list($selectTable, $selectAttribute) = explode(".", $selectAttribute);
+				return $selectTable != $table;
+			});
+			
 			return $this;
 		}
 		
@@ -160,7 +161,7 @@
 				throw new Exception("The attribute specified is invalid: " . $attribute);
 						
 			$table = $this->getExistingTable($table);
-			$this->order[] = $table . "." . $attribute;
+			$this->order[] = strtolower($table) . "." . strtolower($attribute);
 			return $this;
 		}
 		
@@ -169,7 +170,7 @@
 			// $order keys represent tables, and values represent attribute names
 			// example: $order[$table] = $attribute
 			$orderBackup = $this->order;
-			$this->order = array();
+			$this->clearOrder();
 			
 			try
 			{
@@ -267,7 +268,7 @@
 			
 			$table = $this->getExistingTable($table);
 						
-			$this->attributes[$table][$key] = (object) array("value" => $value, "comparator" => $comparator);
+			$this->attributes[$table][strtolower($key)] = (object) array("value" => $value, "comparator" => $comparator);
 			return $this;
 		}
 
@@ -294,14 +295,16 @@
 		public function removeAttribute($key, $table = "")
 		{
 			$table = $this->getExistingTable($table, true);
-			unset($this->attributes[$table][$key]);
+			unset($this->attributes[$table][strtolower($key)]);
 			return $this;
 		}
-		
+				
 		public function clearAttributes($table = "")
 		{
 			if (!empty($table))
 			{
+				$table = strtolower($table);
+				
 				if (!isset($this->attributes[$table]))
 					return;
 
@@ -323,6 +326,7 @@
 						->clearAttributes()
 						->clearTableRelationships()
 						->clearOrder()
+						->clearSelectAttributes()
 						->setOrderDirection();
 		}
 		
@@ -375,9 +379,10 @@
 		public function setComparator($attribute, $comparator, $table = "")
 		{
 			$table = $this->getExistingTable($table);
+			$attribute = strtolower($attribute);
 			
 			if (!isset($this->attributes[$table][$attribute]))
-				throw new Exception("The attribute specified does not exist: " . $table . "." . $attribute);
+				return $this;
 			
 			$this->setAttribute($attribute, $this->getAttribute($attribute, $table), $table, $comparator);
 			return $this;
@@ -389,6 +394,7 @@
 				return null;
 			
 			$table = $this->getExistingTable($table);
+			$attribute = strtolower($attribute);
 			
 			if (!isset($this->attributes[$table][$attribute]))
 				return null;
@@ -405,6 +411,8 @@
 			
 			if (!empty($table))
 			{
+				$table = strtolower($table);
+				
 				if (!isset($this->attributes[$table]))
 					return array();
 				
@@ -445,8 +453,10 @@
 			
 			if (!empty($table))
 			{
+				$table = strtolower($table);
+				
 				if (!isset($this->attributes[$table]))
-					throw new Exception("The table specified does not exist: " . $table);
+					return $this;
 				
 				$f($this->attributes[$table]);
 				return $this;
@@ -455,8 +465,8 @@
 			array_walk($this->attributes, $f);
 			return $this;
 		}
-		
-		public function setTableRelationship($table1 = "", $attribute1 = "", $table2 = "", $attribute2 = "")
+				
+		public function addTableRelationship($table1 = "", $attribute1 = "", $table2 = "", $attribute2 = "")
 		{
 			if (!isset($this->attributes[$table1]))
 				throw new Exception("Invalid table specified: " . $table1);
@@ -468,12 +478,27 @@
 			{
 				if (empty($value))
 					throw new Exception("Required parameter missing: " . $key);
-				
+			
 				if (!Database::isValidIdentifier($value))
 					throw new Exception("The identifier specified is invalid: " . $value);
 			});
 			
-			$this->tableRelationships[$table1 . "." . $attribute1] = $table2 . "." . $attribute2;
+			$attribute1 = strtolower($table1 . "." . $attribute1);
+			$attribute2 = strtolower($table2 . "." . $attribute2);
+			
+			// compares attribute strings lexographically
+			$result = strcmp($attribute1, $attribute2);
+			
+			if ($result > 0)
+				// $attribute1 > $attribute2
+				$relationship = $attribute2 . " = " . $attribute1;
+			else
+				// $attribute1 < $attribute2, or $attribute1 == $attribute2
+				$relationship = $attribute1 . " = " . $attribute2;
+			
+			if (!in_array($relationship, $this->getTableRelationships()))
+				$this->tableRelationships[] = $relationship;
+			
 			return $this;
 		}
 		
@@ -501,11 +526,54 @@
 			}
 			else
 			{
-				if (!$ignoreMissing && !isset($this->attributes[$table]))
+				if (!$ignoreMissing && !isset($this->attributes[strtolower($table)]))
 					throw new Exception("The table specified does not exist: " . $table);
 			}
 			
-			return $table;
+			return strtolower($table);
+		}
+		
+		public function addSelectAttribute($attribute, $table = "")
+		{
+			$table = $this->getExistingTable($table);
+			
+			if (!Database::isValidIdentifier($attribute))
+				throw new Exception("Invalid attribute specified: " . $attribute);
+			
+			$attribute = strtolower($table . "." . $attribute);
+			
+			if (!in_array($attribute, $this->selectAttributes))
+				$this->selectAttributes[] = $attribute;
+			
+			return $this;
+		}
+		
+		public function setSelectAttributes(array $attributes, $table = "")
+		{
+			$table = $this->getExistingTable($table);
+			$backup = $this->selectAttributes;
+			$this->clearSelectAttributes();
+			
+			try
+			{
+				array_walk($attributes, function($attribute, $key, DataModel $dm) use ($table)
+				{
+					$dm->addSelectAttribute($attribute, $table);
+				}, $this);
+			}
+			catch (Exception $ex)
+			{
+				$this->selectAttributes = $backup;
+				throw $ex;
+			}
+			
+			return $this;
+		}
+		
+		public function clearSelectAttributes()
+		{
+			$this->selectAttributes = array();
+			return $this;
 		}
 	}
 ?>
