@@ -570,6 +570,11 @@
 			return $this;
 		}
 		
+		public function getSelectAttributes()
+		{
+			return $this->selectAttributes;
+		}
+		
 		public function clearSelectAttributes()
 		{
 			$this->selectAttributes = array();
