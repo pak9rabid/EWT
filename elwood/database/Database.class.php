@@ -131,32 +131,31 @@
 			$conditionValues = array();
 			$likeConditionValues = array();
 			
-			foreach ($dm->getAttributes() as $attributeName => $attributeValue)
+			foreach ($dm->getAttributes() as $attribute => $value)
 			{
-				list($table, $attributeName) = explode(".", $attributeName);
-				$comparator = $dm->getComparator($attributeName, $table);
+				$comparator = $dm->getComparator($attribute);
 				
 				if (in_array($comparator, array("=", "!=", ">", "<", ">=", "<=")))
 				{
-					$conditions[] = " $table.$attributeName $comparator ? ";
-					$conditionValues[] = $attributeValue;
+					$conditions[] = "$attribute $comparator ?";
+					$conditionValues[] = $value;
 				}
 				else
 				{
-					$likeConditions[] = " $table.$attributeName LIKE ? ";
+					$likeConditions[] = "$attribute LIKE ?";
 					
 					switch ($comparator)
 					{
 						case "*?*":
-							$likeConditionValues[] = "%" . $attributeValue . "%";
+							$likeConditionValues[] = "%" . $value . "%";
 							break;
 							
 						case "*?":
-							$likeConditionValues[] = "%" . $attributeValue;
+							$likeConditionValues[] = "%" . $value;
 							break;
 							
 						case "?*":
-							$likeConditionValues[] = $attributeValue . "%";
+							$likeConditionValues[] = $value . "%";
 					}
 				}
 			}
@@ -182,7 +181,7 @@
 			$results = array();
 			
 			try
-			{
+			{				
 				$stmt = $this->pdo->prepare($prep->getQuery());
 				$stmt->execute($prep->getBindVars());
 				
@@ -204,7 +203,7 @@
 					}, &$normalizedRow);
 					
 					$dm = new DataModel();
-					$dm->setAllAttributes($normalizedRow);
+					$dm->setAttributes($normalizedRow);
 					return $dm;
 					
 				}, $stmt->fetchAll(PDO::FETCH_ASSOC));				
@@ -226,24 +225,22 @@
 			if (empty($tables))
 				throw new Exception("No table(s) specified");
 			
-			$selectAttributes = $dm->getSelectAttributes();
+			$selects = $dm->getSelects();
 			
-			if (empty($selectAttributes))
-				throw new Exception("No select attribute(s) specified");
-			
-			$prep = new DbQueryPreper("SELECT " . implode(", ", array_map(function($selectAttribute)
+			$prep = new DbQueryPreper("SELECT " . (empty($selects) ? "*" : implode(", ", array_map(function($select)
 			{
-				list($table, $attribute) = explode(".", $selectAttribute);
-				return $selectAttribute . " AS \"" . $table . "." . $attribute . "\"";
-			}, $dm->getSelectAttributes())) . " FROM " . implode(", ", $tables));
+				return $select . " AS \"" . $select . "\"";
+			}, $selects))) . " FROM " . implode(", ", $tables));
 			
 			$this->dataModelToParamaterizedWhereClause($dm, $prep);
 			$order = $dm->getOrder();
 			
 			if (!empty($order))
 			{
-				$prep->addSql(" ORDER BY " . implode(", ", $order));
-				$prep->addSql(" " . $dm->getOrderDirection());
+				$prep->addSql(" ORDER BY " . implode(", ", array_map(function($attribute, $direction)
+				{
+					return $attribute . " " . $direction;
+				}, array_keys($order), $order)));
 			}
 			
 			return $this->executeQuery($prep);

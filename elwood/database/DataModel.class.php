@@ -33,7 +33,7 @@
 		protected $attributes = array();
 		protected $order = array();
 		protected $tableRelationships = array();
-		protected $selectAttributes = array();
+		protected $selects = array();
 		protected $db;
 		
 		public static function isValidComparator($comparator)
@@ -92,7 +92,12 @@
 		
 		public function setTable($table)
 		{
-			if (!Database::isValidIdentifier($table = trim($table)))
+			$table = trim($table);
+			
+			if (empty($table))
+				return $this;
+			
+			if (!Database::isValidIdentifier($table))
 				throw new Exception("Invalid table name specified: " . $table);
 			
 			$this->attributes[strtolower($table)] = array();
@@ -139,7 +144,7 @@
 				return $orderTable != $table;
 			});
 			
-			$this->selectAttributes = array_filter($this->selectAttributes, function($selectAttribute) use ($table)
+			$this->selects = array_filter($this->selects, function($selectAttribute) use ($table)
 			{
 				list($selectTable, $selectAttribute) = explode(".", $selectAttribute);
 				return $selectTable != $table;
@@ -188,6 +193,11 @@
 			}
 			
 			return $this;
+		}
+		
+		public function getOrder()
+		{
+			return $this->order;
 		}
 		
 		public function removeOrder($attribute)
@@ -476,9 +486,12 @@
 				if (!Database::isValidIdentifier($val))
 					throw new Exception("Invalid table relationship specified: " . $relationship);
 			}, $relationship);
-		
-			if (count(array_intersect($this->getTables(), array($leftTable, $rightTable))) != 2)
-				throw new Exception("One or more of the tables specified do not exist: " . $leftTable . ", " . $rightTable);
+			
+			if (!in_array($leftTable, $this->getTables()))
+				$this->setTable($leftTable);
+			
+			if (!in_array($rightTable, $this->getTables()))
+				$this->setTable($rightTable);
 		
 			$left = $leftTable . "." . $leftAttr;
 			$right = $rightTable . "." . $rightAttr;
@@ -494,7 +507,7 @@
 		
 			if (!in_array($relationship, $this->getTableRelationships()))
 				$this->tableRelationships[] = $relationship;
-			
+		
 			return $this;
 		}
 		
@@ -530,68 +543,71 @@
 			return $this;
 		}
 		
-		public function addSelectAttribute($attribute)
+		public function addSelect($attribute)
 		{
 			list($table, $attribute) = array_values(self::parseAttribute($attribute));
-			$table = $this->getExistingTable($table);
+			$table = $this->getExistingTable($table, true);
 			
+			if (!in_array($table, $this->getTables()))
+				$this->setTable($table);
+		
 			if (!Database::isValidIdentifier($attribute))
 				throw new Exception("Invalid attribute specified: " . $attribute);
-			
+		
 			$attribute = strtolower($table . "." . $attribute);
-			
-			if (!in_array($attribute, $this->selectAttributes))
-				$this->selectAttributes[] = $attribute;
-			
+		
+			if (!in_array($attribute, $this->selects))
+				$this->selects[] = $attribute;
+		
 			return $this;
 		}
 		
-		public function addSelectAttributes($attributes)
+		public function addSelects($attributes)
 		{
-			$backup = $this->selectAttributes;
+			$backup = $this->selects;
 			
 			try
 			{
 				array_walk(explode(",", $attributes), function($attribute, $key, DataModel $dm)
 				{
-					$dm->addSelectAttribute($attribute);
+					$dm->addSelect($attribute);
 				}, $this);
 			}
 			catch (Exception $ex)
 			{
-				$this->selectAttributes = $backup;
+				$this->selects = $backup;
 				throw $ex;
 			}
 			
 			return $this;
 		}
 		
-		public function setSelectAttributes($attributes)
+		public function setSelects($attributes)
 		{
-			$backup = $this->selectAttributes;
+			$backup = $this->selects;
 			$this->clearSelectAttributes();
 			
 			try
 			{
-				$this->addSelectAttributes($attributes);
+				$this->addSelects($attributes);
 			}
 			catch (Exception $ex)
 			{
-				$this->selectAttributes = $backup;
+				$this->selects = $backup;
 				throw $ex;
 			}
 			
 			return $this;
 		}
 		
-		public function getSelectAttributes()
+		public function getSelects()
 		{
-			return $this->selectAttributes;
+			return $this->selects;
 		}
 		
 		public function clearSelectAttributes()
 		{
-			$this->selectAttributes = array();
+			$this->selects = array();
 			return $this;
 		}
 		

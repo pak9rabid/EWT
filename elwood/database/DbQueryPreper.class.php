@@ -33,7 +33,7 @@
 		protected $bindVars = array();
 		
 		// Constructors
-		public function __construct($sql)
+		public function __construct($sql = "")
 		{
 			$this->query = $sql;
 		}
