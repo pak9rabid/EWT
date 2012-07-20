@@ -267,9 +267,9 @@
 			return $returnAttributes;
 		}
 				
-		public function getAttributeKeys($table = "")
+		public function getAttributeKeys($table = "", $useShortKeys = false)
 		{
-			return array_keys($this->getAttributes($table));
+			return array_keys($this->getAttributes($table, $useShortKeys));
 		}
 		
 		public function setAttribute($attribute, $value, $comparator = "=")
