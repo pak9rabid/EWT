@@ -224,21 +224,33 @@
 			return isset($this->attributes[$table][$attribute]) ? $this->attributes[$table][$attribute]->value : null;
 		}
 		
-		public function getAttributes($table = "")
+		public function getAttributes($table = "", $useShortKeys = false)
 		{
+			/**
+			 * WARNING:	if $useShortKeys is set to true and there are multiple tables that
+			 *  		contain the same attribute name, the last entry will override the
+			 *  		previous entry in the returned array
+			 */
 			$returnAttributes = array();
 			
-			$f = function(array $attributes, $table, array &$returnAttributes)
+			$f = function(array $attributes, $table, array &$returnAttributes) use ($useShortKeys)
 			{
 				/**
 				 * given the table name $table, transform $attributes (a map of
 				 * attributes keys to attribute objects for table $table)
-				 * to a map of [$table . $attributeKey] => $attributeObject->value, and
-				 * store in $returnAttributes
+				 * to a map of:
+				 * 		[<table> . <attribute name>] => <attribute value>
+				 * 
+				 * and store in $returnAttributes
+				 * 
+				 * if $useShortKeys is set to true, the array is returned with the table part of
+				 * the key removed, so it would look like this instead:
+				 * 
+				 * 		[<attribute name>] => <attribute value>
 				 */
-				array_walk($attributes, function($attributeObject, $attributeKey, $returnAttributes) use ($table)
+				array_walk($attributes, function($attributeObject, $attributeKey, $returnAttributes) use ($table, $useShortKeys)
 				{
-					$returnAttributes[$table . "." . $attributeKey] = $attributeObject->value;
+					$returnAttributes[$useShortKeys ? $attributeKey : $table . "." . $attributeKey] = $attributeObject->value;
 				}, &$returnAttributes);
 			};
 			
