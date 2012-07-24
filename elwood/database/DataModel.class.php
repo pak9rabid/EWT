@@ -90,6 +90,11 @@
 			return $this;
 		}
 		
+		public function getConnection()
+		{
+			return $this->db;
+		}
+		
 		public function setTable($table)
 		{
 			$table = trim($table);

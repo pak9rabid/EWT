@@ -246,15 +246,38 @@
 			return $this->executeQuery($prep);
 		}
 		
-		public function executeInsert(DataModel $data)
+		public function executeInsert(DataModel $dm)
 		{
-			// Insert new row into the database
-			$prep = new DbQueryPreper("INSERT INTO " . $data->getTable() . " (");
-			$prep->setTable($data->getTable());
-			$prep->addSql(implode(",", $data->getAttributeKeys()) . ") VALUES (");
-			$prep->addVariables($data->getAttributeValues());
-			$prep->addSql(")");			
-			$this->executeQuery($prep);
+			/** iterates through all tables specified in $dm and inserts all set attributes
+			 *	into the database, as a single transaction (if not already participating inone).
+			 */
+			
+			if (!$alreadyInTransaction = $this->pdo->inTransaction())
+				$this->pdo->beginTransaction();
+			
+			$db = $this;
+			
+			try
+			{
+				array_walk($dm->getTables(), function($table, $key, DataModel $dm) use ($db)
+				{
+					$prep = new DbQueryPreper("INSERT INTO " . $table . " (");
+					$prep->addSql(implode(",", $dm->getAttributeKeys($table, true)) . ") VALUES (");
+					$prep->addVariables(array_values($dm->getAttributes($table)));
+					$prep->addSql(")");
+					$db->executeQuery($prep);
+				}, $dm);
+			}
+			catch (Exception $ex)
+			{
+				if (!$alreadyInTransaction)
+					$this->pdo->rollBack();
+				
+				throw $ex;
+			}
+			
+			if (!$alreadyInTransaction)
+				$this->pdo->commit();
 		}
 		
 		public function executeInserts(array $data)
