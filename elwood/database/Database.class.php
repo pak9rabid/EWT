@@ -124,17 +124,17 @@
 			return true;
 		}
 		
-		public function dataModelToParamaterizedWhereClause(DataModel $dm, DbQueryPreper $prep = null)
+		public function dataModelToParamaterizedWhereClause(DataModel $dm, DbQueryPreper $prep = null, $table = "")
 		{
 			$conditions = array();
 			$likeConditions = array();
 			$conditionValues = array();
 			$likeConditionValues = array();
 			
-			foreach ($dm->getAttributes() as $attribute => $value)
+			foreach ($dm->getAttributes($table) as $attribute => $value)
 			{
 				$comparator = $dm->getComparator($attribute);
-				
+			
 				if (in_array($comparator, array("=", "!=", ">", "<", ">=", "<=")))
 				{
 					$conditions[] = "$attribute $comparator ?";
@@ -143,24 +143,24 @@
 				else
 				{
 					$likeConditions[] = "$attribute LIKE ?";
-					
+			
 					switch ($comparator)
 					{
 						case "*?*":
 							$likeConditionValues[] = "%" . $value . "%";
 							break;
-							
+			
 						case "*?":
 							$likeConditionValues[] = "%" . $value;
 							break;
-							
+			
 						case "?*":
 							$likeConditionValues[] = $value . "%";
 					}
 				}
 			}
 			
-			$conditions = array_merge($dm->getTableRelationships(), $conditions, $likeConditions);
+			$conditions = array_merge(empty($table) ? $dm->getTableRelationships() : array(), $conditions, $likeConditions);
 			
 			if (empty($conditions))
 				return "";
@@ -177,7 +177,7 @@
 		}
 		
 		public function executeQuery(DbQueryPreper $prep, $getNumRowsAffected = false)
-		{
+		{			
 			$results = array();
 			
 			try
@@ -249,7 +249,7 @@
 		public function executeInsert(DataModel $dm)
 		{
 			/** iterates through all tables specified in $dm and inserts all set attributes
-			 *	into the database, as a single transaction (if not already participating inone).
+			 *	into the database, as a single transaction (if not already participating in one).
 			 */
 			
 			if (!$alreadyInTransaction = $this->pdo->inTransaction())
@@ -278,29 +278,6 @@
 			
 			if (!$alreadyInTransaction)
 				$this->pdo->commit();
-		}
-		
-		public function executeInserts(array $data)
-		{
-			$this->pdo->beginTransaction();
-						
-			try
-			{
-				foreach ($data as $row)
-				{
-					if (!($row instanceof DataModel))
-						throw new Exception("Invalid type: must be of type DataModel");
-						
-					$this->executeInsert($row);
-				}
-			}
-			catch (Exception $ex)
-			{
-				$this->pdo->rollBack();
-				throw $ex;
-			}
-			
-			$this->pdo->commit();
 		}
 
 		public function executeUpdate(DataModel $data)
@@ -331,20 +308,37 @@
 			$prep->addVariable($primaryKeyValue);			
 			$this->executeQuery($prep);
 		}
-
-		public function executeDelete(DataModel $data)
+		
+		public function executeDelete(DataModel $dm)
 		{
-			// Deletes rows from the database based on the criteria specified in $data
-			$prep = new DbQueryPreper("DELETE FROM " . $data->getTable());
-			$prep->setTable($data->getTable());
+			/** iterates through all tables in $dm and removes
+			 * 	all set attributes from the database, as a single
+			 * 	transaction (if not already participating in one)
+			 */
+			if (!$alreadyInTransaction = $this->pdo->inTransaction())
+				$this->pdo->beginTransaction();
 			
-			if (count($data->getAttributeKeys()) > 0)
+			$db = $this;
+			
+			try
 			{
-				$prep->addSql(" WHERE ");
-				self::datahashToParamaterizedWhereClause($data, $prep);
+				array_walk($dm->getTables(), function($table, $key, DataModel $dm) use ($db)
+				{
+					$prep = new DbQueryPreper("DELETE FROM " . $table);
+					$db->dataModelToParamaterizedWhereClause($dm, $prep, $table);
+					$db->executeQuery($prep);
+				}, $dm);
+				
+				if (!$alreadyInTransaction)
+					$this->pdo->commit();
 			}
-						
-			return $this->executeQuery($prep, true);
+			catch (Exception $ex)
+			{
+				if (!$alreadyInTransaction)
+					$this->pdo->rollBack();
+				
+				throw $ex;
+			}
 		}
 		
 		public function getPdo()
