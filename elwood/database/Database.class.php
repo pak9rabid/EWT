@@ -29,7 +29,7 @@
 	
 	abstract class Database
 	{
-		const SUPPORTED_DATABASE_TYPES = "mysql,oci,pgsql,sqlite";
+		const SUPPORTED_DATABASE_TYPES = "mysql,pgsql,sqlite";
 		const CONNECTION_CONFIG_FILE = "db.cfg";
 		const MAX_IDENTIFIER_LENGTH = 128;
 		
