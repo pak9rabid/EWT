@@ -29,6 +29,7 @@
 	{
 		public function __construct(ConnectionConfig $config)
 		{
+			parent::__construct($config);
 			$this->dsn = "sqlite:" . $config->getDatabase();
 			$this->pdo = new PDO($this->dsn);
 			$this->pdo->exec("PRAGMA foreign_keys = ON");

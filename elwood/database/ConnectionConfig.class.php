@@ -33,8 +33,9 @@
 		private $database;
 		private $username;
 		private $password;
+		private $debug;
 		
-		public function __construct($databaseType, $host = "", $port = "", $database = "", $username = "", $password = "")
+		public function __construct($databaseType, $host = "", $port = "", $database = "", $username = "", $password = "", $debug = "")
 		{			
 			$this->setDatabaseType($databaseType);
 			$this->setHost($host);
@@ -42,6 +43,7 @@
 			$this->setDatabase($database);
 			$this->setUsername($username);
 			$this->setPassword($password);
+			$this->setDebugMode($debug);
 		}
 				
 		public function getDatabaseType()
@@ -72,6 +74,11 @@
 		public function getPassword()
 		{
 			return $this->password;
+		}
+		
+		public function isDebugMode()
+		{
+			return $this->debug;
 		}
 		
 		public function setDatabaseType($databaseType)
@@ -108,6 +115,11 @@
 		public function setPassword($password = "")
 		{
 			$this->password = $password;
+		}
+		
+		public function setDebugMode($debug = "")
+		{
+			$this->debug = $debug == "true";
 		}
 	}
 ?>

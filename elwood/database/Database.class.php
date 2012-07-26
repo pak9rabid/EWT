@@ -35,11 +35,18 @@
 		
 		protected $pdo;
 		protected $dsn;
-				
-		abstract public function __construct(ConnectionConfig $config);
+		protected $config;
 		
-		public static function getInstance(ConnectionConfig $config)
+		protected function __construct(ConnectionConfig $config)
 		{
+			$this->config = $config;
+		}
+		
+		public static function getInstance(ConnectionConfig $config = null)
+		{
+			if (empty($config))
+				$config = self::getConnectionConfig();
+			
 			switch ($config->getDatabaseType())
 			{
 				case "mysql":
@@ -80,7 +87,8 @@
 								"port" => "",
 								"database" => "",
 								"username" => "",
-								"password" => ""
+								"password" => "",
+								"debug" => ""
 							);
 			
 			foreach (file($configFile) as $line)
@@ -89,11 +97,11 @@
 					// line is commented out...skip
 					continue;
 					
-				@list($key, $value) = explode("=", $line);
+				@list($key, $value) = explode("=", $line, 2);
 				$config[trim($key)] = trim($value);
 			}
 			
-			return new ConnectionConfig($config["databaseType"], $config["host"], $config["port"], $config["database"], $config["username"], $config["password"]);
+			return new ConnectionConfig($config["databaseType"], $config["host"], $config["port"], $config["database"], $config["username"], $config["password"], $config["debug"]);
 		}
 		
 		public static function getSupportedDatabaseTypes()
@@ -177,7 +185,10 @@
 		}
 		
 		public function executeQuery(DbQueryPreper $prep, $getNumRowsAffected = false)
-		{			
+		{
+			if ($this->config->isDebugMode())
+				echo "Query: " . $prep->getQueryDebug() . "\n";
+				
 			$results = array();
 			
 			try
@@ -349,6 +360,11 @@
 		public function getDsn()
 		{
 			return $this->dsn;
+		}
+		
+		public function getConfig()
+		{
+			return $this->config;
 		}
 	}
 ?>

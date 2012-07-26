@@ -30,6 +30,7 @@
 		const DEFAULT_PORT = 1521;
 		protected function __construct(ConnectionConfig $config)
 		{
+			parent::__construct($config);
 			$port = $config->getPort();
 			$port =  empty($port) ? self::DEFAULT_PORT : $port;
 			
