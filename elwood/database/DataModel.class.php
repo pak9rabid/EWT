@@ -34,6 +34,7 @@
 		protected $order = array();
 		protected $tableRelationships = array();
 		protected $selects = array();
+		protected $updates = array();
 		protected $db;
 		
 		public static function isValidComparator($comparator)
@@ -628,6 +629,60 @@
 			return $this;
 		}
 		
+		public function setUpdate($attribute, $value)
+		{
+			list($table, $attribute) = array_values(self::parseAttribute($attribute));
+			
+			if (!Database::isValidIdentifier($attribute))
+				throw new Exception("Invalid attribute specified: " . $attribute);
+			
+			$table = $this->getExistingTable($table);
+			$this->updates[$table . "." . $attribute] = $value;
+			return $this;
+		}
+		
+		public function setUpdates(array $attributes)
+		{
+			$backup = $this->updates;
+			
+			try
+			{
+				array_walk($attributes, function($value, $attribute, DataModel $dm)
+				{
+					$dm->setUpdate($attribute, $value);
+				}, $this);
+			}
+			catch (Exception $ex)
+			{
+				$this->updates = $backup;
+				throw $ex;
+			}
+			
+			return $this;
+		}
+		
+		public function removeUpdate($attribute)
+		{
+			unset($this->updates[$attribute]);
+			return $this;
+		}
+		
+		public function getUpdate($attribute)
+		{
+			return isset($this->updates[$attribute]) ? $this->updates[$attribute] : null;
+		}
+		
+		public function getUpdates()
+		{
+			return $this->updates;
+		}
+		
+		public function clearUpdates()
+		{
+			$this->updates = array();
+			return $this;
+		}
+		
 		private final function getExistingTable($table, $ignoreMissing = false)
 		{
 			$tables = $this->getTables();
@@ -641,6 +696,9 @@
 			}
 			else
 			{
+				if (!Database::isValidIdentifier($table))
+					throw new Exception("The table specified is invalid: " . $table);
+				
 				if (!$ignoreMissing && !isset($this->attributes[strtolower($table)]))
 					throw new Exception("The table specified does not exist: " . $table);
 			}
