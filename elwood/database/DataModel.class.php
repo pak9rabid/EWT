@@ -386,14 +386,14 @@
 			return $this;
 		}
 		
-		public function executeUpdate(DataModel $criteria)
+		public function executeUpdate()
 		{
 			if (!empty($this->db))
-				$this->db->executeUpdate($this, $criteria);
+				$this->db->executeUpdate($this);
 			else
 			{
 				$db = Database::getInstance(Database::getConnectionConfig());
-				$db->executeUpdate($this, $criteria);
+				$db->executeUpdate($this);
 			}
 		}
 

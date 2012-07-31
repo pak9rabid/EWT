@@ -290,34 +290,48 @@
 			if (!$alreadyInTransaction)
 				$this->pdo->commit();
 		}
-
-		public function executeUpdate(DataModel $data)
+		
+		public function executeUpdate(DataModel $dm)
 		{
-			// Update row in the database
-			$primaryKey = $data->getPrimaryKey();
-			$primaryKeyValue = $data->getAttribute($primaryKey);
-
-			if (empty($primaryKey) || empty($primaryKeyValue))
-				throw new Exception("Primary key not specified and/or set");
-
-			$prep = new DbQueryPreper("UPDATE " . $data->getTable() . " SET");
-			$prep->setTable($data->getTable());
+			/** iterates through all tables in $dm and updates
+			 * 	all set updates with the criterial specified in
+			 * 	the set attributes
+			 */
+			if (!$alreadyInTransaction = $this->pdo->inTransaction())
+				$this->pdo->beginTransaction();
 			
-			foreach ($data->getAttributeMap() as $key => $value)
+			$db = $this;
+			
+			try
 			{
-				if ($key != $primaryKey)
+				array_walk($dm->getTables(), function($table, $key, DataModel $dm) use ($db)
 				{
-					if (count($prep->getBindVars()) > 0)
-						$prep->addSql(",");
+					$updates = $dm->getUpdates($table, true);
+					$attributes = $dm->getAttributes($table, true);
 					
-					$prep->addSql(" $key = ");
-					$prep->addVariable($value);
-				}
+					if (!empty($updates))
+					{
+						$prep = new DbQueryPreper("UPDATE " . $table . " SET " . implode(", ", array_map(function($attribute, $value)
+						{
+							return "$attribute = ?";
+						}, array_keys($updates), $updates)));
+						
+						$prep->addVariablesNoPlaceholder(array_values($dm->getUpdates($table)));
+						$db->dataModelToParamaterizedWhereClause($dm, $prep, $table);
+						$db->executeQuery($prep);
+					}
+				}, $dm);
+				
+				if (!$alreadyInTransaction)
+					$this->pdo->commit();
 			}
-			
-			$prep->addSql(" WHERE $primaryKey = ");
-			$prep->addVariable($primaryKeyValue);			
-			$this->executeQuery($prep);
+			catch (Exception $ex)
+			{
+				if (!$alreadyInTransaction)
+					$this->pdo->rollBack();
+				
+				throw $ex;
+			}
 		}
 		
 		public function executeDelete(DataModel $dm)
