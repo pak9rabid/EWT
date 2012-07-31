@@ -672,9 +672,36 @@
 			return isset($this->updates[$attribute]) ? $this->updates[$attribute] : null;
 		}
 		
-		public function getUpdates()
+		public function getUpdates($table = "", $useShortKeys = false)
 		{
-			return $this->updates;
+			/**
+			 * WARNING:	if $useShortKeys is set to true and there are multiple tables that
+			 *  		contain the same attribute name, the last entry will override the
+			 *  		previous entry in the returned array
+			 */
+			if (empty($table) && !$useShortKeys)
+				return $this->updates;
+			
+			$returnArray = array();
+			
+			array_walk($this->updates, function($value, $attribute, array $returnArray) use ($table, $useShortKeys)
+			{
+				$parts = DataModel::parseAttribute($attribute);
+				
+				if ($useShortKeys)
+					$attribute = $parts['attribute'];
+				
+				if (!empty($table))
+				{
+					if ($table == $parts['table'])
+						$returnArray[$attribute] = $value;
+				}
+				else
+					$returnArray[$attribute] = $value;
+					
+			}, &$returnArray);
+			
+			return $returnArray;
 		}
 		
 		public function clearUpdates()
