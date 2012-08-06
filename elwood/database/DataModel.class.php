@@ -117,10 +117,7 @@
 			
 			try
 			{
-				array_walk(explode(",", $tables), function($table, $key, DataModel $dm)
-				{
-					$dm->setTable($table);
-				}, $this);
+				array_walk(explode(",", $tables), array($this, "setTable"));
 			}
 			catch (Exception $ex)
 			{
@@ -144,17 +141,20 @@
 				return !in_array($table, array($table1, $table2));
 			});
 			
-			$this->order = array_filter($this->order, function($order) use ($table)
-			{
-				list($orderTable, $attribute) = explode(".", $order);
-				return $orderTable != $table;
-			});
-			
 			$this->selects = array_filter($this->selects, function($selectAttribute) use ($table)
 			{
 				list($selectTable, $selectAttribute) = explode(".", $selectAttribute);
 				return $selectTable != $table;
 			});
+			
+			$f = function($attribute, $rmTable)
+			{
+				list($table, $attribute) = explode(".", $attribute);
+				return !($table == $rmTable);
+			};
+			
+			$this->order = array_diff_ukey($this->order, array_flip(array($table)), $f);
+			$this->updates = array_diff_ukey($this->updates, array_flip(array($table)), $f);
 			
 			return $this;
 		}
@@ -180,14 +180,18 @@
 			return $this;
 		}
 		
-		public function setOrder($attributes, $direction = "ASC")
+		public function setOrder(array $order)
 		{
+			/** $order is excpected to be an array in the format:
+			 * 
+			 * 		$order[<attribute>] = <'ASC|DESC'>
+			 */
 			$backup = $this->order;
 			$this->clearOrder();
-			
+		
 			try
 			{
-				array_walk(explode(",", $attributes), function($attribute, $key, DataModel $dm) use ($direction)
+				array_walk($order, function($direction, $attribute, DataModel $dm)
 				{
 					$dm->addOrder($attribute, $direction);
 				}, $this);
@@ -197,9 +201,9 @@
 				$this->order = $backup;
 				throw $ex;
 			}
-			
+		
 			return $this;
-		}
+		}	
 		
 		public function getOrder()
 		{
@@ -245,7 +249,8 @@
 				 * given the table name $table, transform $attributes (a map of
 				 * attributes keys to attribute objects for table $table)
 				 * to a map of:
-				 * 		[<table> . <attribute name>] => <attribute value>
+				 * 
+				 * 		[<table>.<attribute name>] => <attribute value>
 				 * 
 				 * and store in $returnAttributes
 				 * 
@@ -345,7 +350,7 @@
 				return $this;
 			}
 			
-			array_walk($this->attributes, function(&$attributes, $table)
+			array_walk($this->attributes, function(&$attributes)
 			{
 				$attributes = array();
 			});
@@ -359,7 +364,8 @@
 						->clearAttributes()
 						->clearTableRelationships()
 						->clearOrder()
-						->clearSelectAttributes();
+						->clearSelects()
+						->clearUpdates();
 		}
 		
 		public function executeSelect($filterNullValues = false)
@@ -536,10 +542,7 @@
 			
 			try
 			{
-				array_walk(explode(",", $relationships), function($relationship, $key, DataModel $dm)
-				{
-					$dm->setTableRelationship($relationship);
-				}, $this);
+				array_walk(explode(",", $relationships), array($this, "setTableRelationship"));
 			}
 			catch (Exception $ex)
 			{
@@ -586,10 +589,7 @@
 			
 			try
 			{
-				array_walk(explode(",", $attributes), function($attribute, $key, DataModel $dm)
-				{
-					$dm->addSelect($attribute);
-				}, $this);
+				array_walk(explode(",", $attributes), array($this, "addSelect"));
 			}
 			catch (Exception $ex)
 			{
@@ -603,7 +603,7 @@
 		public function setSelects($attributes)
 		{
 			$backup = $this->selects;
-			$this->clearSelectAttributes();
+			$this->clearSelects();
 			
 			try
 			{
@@ -623,7 +623,7 @@
 			return $this->selects;
 		}
 		
-		public function clearSelectAttributes()
+		public function clearSelects()
 		{
 			$this->selects = array();
 			return $this;
