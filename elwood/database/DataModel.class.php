@@ -117,7 +117,10 @@
 			
 			try
 			{
-				array_walk(explode(",", $tables), array($this, "setTable"));
+				$tables = explode(",", $tables);
+				$f = array($this, "setTable");
+				
+				array_walk($tables, $f);
 			}
 			catch (Exception $ex)
 			{
@@ -238,12 +241,12 @@
 		{
 			/**
 			 * WARNING:	if $useShortKeys is set to true and there are multiple tables that
-			 *  		contain the same attribute name, the last entry will override the
+			 *  		contain the same attribute name, the last entry will overwrite the
 			 *  		previous entry in the returned array
 			 */
 			$returnAttributes = array();
 			
-			$f = function(array $attributes, $table, array &$returnAttributes) use ($useShortKeys)
+			$f = function(array $attributes, $table) use ($useShortKeys, &$returnAttributes)
 			{
 				/**
 				 * given the table name $table, transform $attributes (a map of
@@ -259,10 +262,11 @@
 				 * 
 				 * 		[<attribute name>] => <attribute value>
 				 */
-				array_walk($attributes, function($attributeObject, $attributeKey, $returnAttributes) use ($table, $useShortKeys)
+				
+				array_walk($attributes, function($attributeObject, $attributeKey) use ($table, $useShortKeys, &$returnAttributes)
 				{
 					$returnAttributes[$useShortKeys ? $attributeKey : $table . "." . $attributeKey] = $attributeObject->value;
-				}, &$returnAttributes);
+				}, $returnAttributes);
 			};
 			
 			if (!empty($table))
@@ -270,11 +274,11 @@
 				if (!isset($table, $this->attributes[$table]))
 					return array();
 				
-				$f($this->attributes[$table], $table, $returnAttributes);
+				$f($this->attributes[$table], $table);
 				return $returnAttributes;
 			}
 			
-			array_walk($this->attributes, $f, &$returnAttributes);
+			array_walk($this->attributes, $f);
 			return $returnAttributes;
 		}
 				
@@ -368,49 +372,49 @@
 						->clearUpdates();
 		}
 		
-		public function executeSelect($filterNullValues = false)
+		public function executeSelect(&$query = null)
 		{
 			if (!empty($this->db))
-				return $this->db->executeSelect($this, $filterNullValues);
+				return $this->db->executeSelect($this, $query);
 			else
 			{
 				$db = Database::getInstance(Database::getConnectionConfig());
-				return $db->executeSelect($this, $filterNullValues);
+				return $db->executeSelect($this, $query);
 			}
 		}
 
-		public function executeInsert()
+		public function executeInsert(&$query = null)
 		{			
 			if (!empty($this->db))
-				$this->db->executeInsert($this);
+				$this->db->executeInsert($this, $query);
 			else
 			{
 				$db = Database::getInstance(Database::getConnectionConfig());
-				$db->executeInsert($this);
+				$db->executeInsert($this, $query);
 			}
 			
 			return $this;
 		}
 		
-		public function executeUpdate()
+		public function executeUpdate(&$query = null)
 		{
 			if (!empty($this->db))
-				$this->db->executeUpdate($this);
+				$this->db->executeUpdate($this, $query);
 			else
 			{
 				$db = Database::getInstance(Database::getConnectionConfig());
-				$db->executeUpdate($this);
+				$db->executeUpdate($this, $query);
 			}
 		}
 
-		public function executeDelete()
+		public function executeDelete(&$query = null)
 		{			
 			if (!empty($this->db))
-				return $this->db->executeDelete($this);
+				return $this->db->executeDelete($this, $query);
 			else
 			{
 				$db = Database::getInstance(Database::getConnectionConfig());
-				return $db->executeDelete($this);
+				return $db->executeDelete($this, $query);
 			}
 		}
 		
@@ -457,7 +461,7 @@
 			
 			$allComparators = array();
 			
-			array_walk($this->attributes, function(array $attributes, $table, $allComparators) use ($f)
+			array_walk($this->attributes, function(array $attributes, $table) use ($f, &$allComparators)
 			{
 				$tableComparators = array_map($f, $attributes);
 				
@@ -467,7 +471,7 @@
 				}, array_keys($tableComparators)), $tableComparators);
 				
 				$allComparators = array_merge($allComparators, $tableComparators);
-			}, &$allComparators);
+			});
 			
 			return $allComparators;
 		}
@@ -502,11 +506,12 @@
 			list($left, $right) = explode("=", $relationship, 2);
 			list($leftTable, $leftAttr) = explode(".", $left, 2);
 			list($rightTable, $rightAttr) = explode(".", $right, 2);
-		
-			array_walk($a = array(&$leftTable, &$leftAttr, &$rightTable, &$rightAttr), function(&$val, $key, $relationship)
+			$a = array(&$leftTable, &$leftAttr, &$rightTable, &$rightAttr);
+			
+			array_walk($a, function(&$val, $key, $relationship)
 			{
 				$val = trim(strtolower($val));
-		
+			
 				if (!Database::isValidIdentifier($val))
 					throw new Exception("Invalid table relationship specified: " . $relationship);
 			}, $relationship);
@@ -542,7 +547,9 @@
 			
 			try
 			{
-				array_walk(explode(",", $relationships), array($this, "setTableRelationship"));
+				$relationships = explode(",", $relationships);
+				$f = array($this, "setTableRelationship");
+				array_walk($relationships, $f);
 			}
 			catch (Exception $ex)
 			{
@@ -589,7 +596,10 @@
 			
 			try
 			{
-				array_walk(explode(",", $attributes), array($this, "addSelect"));
+				$attributes = explode(",", $attributes);
+				$f = array($this, "addSelect");
+				
+				array_walk($attributes, $f);
 			}
 			catch (Exception $ex)
 			{
@@ -684,7 +694,7 @@
 			
 			$returnArray = array();
 			
-			array_walk($this->updates, function($value, $attribute, array $returnArray) use ($table, $useShortKeys)
+			array_walk($this->updates, function($value, $attribute) use ($table, $useShortKeys, &$returnArray)
 			{
 				$parts = DataModel::parseAttribute($attribute);
 				
@@ -699,7 +709,7 @@
 				else
 					$returnArray[$attribute] = $value;
 					
-			}, &$returnArray);
+			});
 			
 			return $returnArray;
 		}

@@ -203,7 +203,7 @@
 				{
 					$normalizedRow = array();
 					
-					array_walk($row, function($value, $attribute, array $normalizedRow)
+					array_walk($row, function($value, $attribute) use (&$normalizedRow)
 					{
 						$parts = explode(".", $attribute);
 						
@@ -211,7 +211,7 @@
 							$attribute = "unknown_table." . $attribute;
 						
 						$normalizedRow[$attribute] = $value;
-					}, &$normalizedRow);
+					});
 					
 					$dm = new DataModel();
 					$dm->setAttributes($normalizedRow);
@@ -229,7 +229,7 @@
 			}
 		}
 		
-		public function executeSelect(DataModel $dm, $filterNullValues = false)
+		public function executeSelect(DataModel $dm, &$query = null)
 		{
 			$tables = $dm->getTables();
 			
@@ -254,10 +254,13 @@
 				}, array_keys($order), $order)));
 			}
 			
+			if (isset($query))
+				$query = $prep->getQueryDebug();
+			
 			return $this->executeQuery($prep);
 		}
 		
-		public function executeInsert(DataModel $dm)
+		public function executeInsert(DataModel $dm, &$query = null)
 		{
 			/** iterates through all tables specified in $dm and inserts all set attributes
 			 *	into the database, as a single transaction (if not already participating in one).
@@ -267,17 +270,31 @@
 				$this->pdo->beginTransaction();
 			
 			$db = $this;
+			$queries = array();
 			
 			try
 			{
-				array_walk($dm->getTables(), function($table, $key, DataModel $dm) use ($db)
+				@array_walk($dm->getTables(), function($table, $key, DataModel $dm) use ($db, $query, &$queries)
 				{
 					$prep = new DbQueryPreper("INSERT INTO " . $table . " (");
 					$prep->addSql(implode(",", $dm->getAttributeKeys($table, true)) . ") VALUES (");
 					$prep->addVariables(array_values($dm->getAttributes($table)));
 					$prep->addSql(")");
+					
+					if (isset($query))
+					{
+						$arr = explode("\n", $query);
+						$query = implode("\n", explode("\n", $query));
+					}
+					
+					if (isset($query))
+						$queries[] = $prep->getQueryDebug();
+					
 					$db->executeQuery($prep);
 				}, $dm);
+				
+				if (!$alreadyInTransaction)
+					$this->pdo->commit();
 			}
 			catch (Exception $ex)
 			{
@@ -287,11 +304,11 @@
 				throw $ex;
 			}
 			
-			if (!$alreadyInTransaction)
-				$this->pdo->commit();
+			if (isset($query))
+				$query = implode("\n", $queries);
 		}
 		
-		public function executeUpdate(DataModel $dm)
+		public function executeUpdate(DataModel $dm, &$query = null)
 		{
 			/** iterates through all tables in $dm and updates
 			 * 	all set updates with the criterial specified in
@@ -301,10 +318,11 @@
 				$this->pdo->beginTransaction();
 			
 			$db = $this;
+			$queries = array();
 			
 			try
 			{
-				array_walk($dm->getTables(), function($table, $key, DataModel $dm) use ($db)
+				@array_walk($dm->getTables(), function($table, $key, DataModel $dm) use ($db, $query, &$queries)
 				{
 					$updates = $dm->getUpdates($table, true);
 					$attributes = $dm->getAttributes($table, true);
@@ -318,6 +336,10 @@
 						
 						$prep->addVariablesNoPlaceholder(array_values($dm->getUpdates($table)));
 						$db->dataModelToParamaterizedWhereClause($dm, $prep, $table);
+						
+						if (isset($query))
+							$queries[] = $prep->getQueryDebug();
+						
 						$db->executeQuery($prep);
 					}
 				}, $dm);
@@ -332,9 +354,12 @@
 				
 				throw $ex;
 			}
+			
+			if (isset($query))
+				$query = implode("\n", $queries);
 		}
 		
-		public function executeDelete(DataModel $dm)
+		public function executeDelete(DataModel $dm, &$query = null)
 		{
 			/** iterates through all tables in $dm and removes
 			 * 	all set attributes from the database, as a single
@@ -344,13 +369,18 @@
 				$this->pdo->beginTransaction();
 			
 			$db = $this;
+			$queries = array();
 			
 			try
 			{
-				array_walk($dm->getTables(), function($table, $key, DataModel $dm) use ($db)
+				@array_walk($dm->getTables(), function($table, $key, DataModel $dm) use ($db, $query, &$queries)
 				{
 					$prep = new DbQueryPreper("DELETE FROM " . $table);
 					$db->dataModelToParamaterizedWhereClause($dm, $prep, $table);
+					
+					if (isset($query))
+						$queries[] = $prep->getQueryDebug();
+					
 					$db->executeQuery($prep);
 				}, $dm);
 				
@@ -364,6 +394,9 @@
 				
 				throw $ex;
 			}
+			
+			if (isset($query))
+				$query = implode("\n", $queries);
 		}
 		
 		public function getPdo()
