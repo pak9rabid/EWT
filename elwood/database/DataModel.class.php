@@ -42,10 +42,16 @@
 			return in_array($comparator, array("=", "!=", ">", "<", ">=", "<=", "*?*", "*?", "?*"));
 		}
 		
-		public static function parseAttribute($attribute)
+		public static function parseAttributeName($attributeName)
 		{
-			$parts = explode(".", $attribute, 2);
-			return count($parts) > 1 ? array("table" => strtolower(trim($parts[0])), "attribute" => strtolower(trim($parts[1]))) : array("table" => "", "attribute" => strtolower(trim($parts[0])));
+			/** parses $attributeName and returns an object
+			 * 	with the following properties:
+			 * 		
+			 * 		$attribute->table = <attribute table>
+			 * 		$attribute->name = <attribute name>
+			 */
+			$parts = explode(".", $attributeName, 2);
+			return (object) (count($parts) > 1 ? array("table" => strtolower(trim($parts[0])), "name" => strtolower(trim($parts[1]))) : array("table" => "", "name" => strtolower(trim($parts[0]))));
 		}
 		
 		public function __construct($tables = "")
@@ -167,19 +173,19 @@
 			return array_keys($this->attributes);
 		}
 		
-		public function addOrder($attribute, $direction = "ASC")
+		public function addOrder($attributeName, $direction = "ASC")
 		{
-			list($table, $attribute) = array_values(self::parseAttribute($attribute));
+			$attribute = self::parseAttributeName($attributeName);
 			
-			if (!Database::isValidIdentifier($attribute))
-				throw new Exception("The attribute specified is invalid: " . $attribute);
+			if (!Database::isValidIdentifier($attribute->name))
+				throw new Exception("The attribute specified is invalid: " . $attribute->name);
 			
 			if (!in_array($direction = trim($direction), array("ASC", "DESC")))
 				throw new Exception("Invalid order direction specified : " . $direction);
 			
-			$table = $this->getExistingTable($table);
+			$attribute->table = $this->getExistingTable($attribute->table);
 			
-			$this->order[$table . "." . $attribute] = $direction;
+			$this->order[$attribute->table . "." . $attribute->name] = $direction;
 			return $this;
 		}
 		
@@ -213,11 +219,11 @@
 			return $this->order;
 		}
 		
-		public function removeOrder($attribute)
+		public function removeOrder($attributeName)
 		{
-			list($table, $attribute) = array_values(self::parseAttribute($attribute));
-			$table = $this->getExistingTable($table, true);
-			unset($this->order[$table . "." . $attribute]);
+			$attribute = self::parseAttributeName($attributeName);
+			$attribute->$table = $this->getExistingTable($attribute->$table, true);
+			unset($this->order[$attribute->$table . "." . $attribute->name]);
 			return $this;
 		}
 		
@@ -227,14 +233,14 @@
 			return $this;
 		}
 		
-		public function getAttribute($attribute)
+		public function getAttribute($attributeName)
 		{
-			if (empty($attribute))
+			if (empty($attributeName))
 				return null;
-			
-			list($table, $attribute) = array_values(self::parseAttribute($attribute));
-			$table = $this->getExistingTable($table);
-			return isset($this->attributes[$table][$attribute]) ? $this->attributes[$table][$attribute]->value : null;
+		
+			$attribute = self::parseAttributeName($attributeName);
+			$attribute->table = $this->getExistingTable($attribute->table);
+			return isset($this->attributes[$attribute->table][$attribute->name]) ? $this->attributes[$attribute->table][$attribute->name]->value : null;
 		}
 		
 		public function getAttributes($table = "", $useShortKeys = false)
@@ -287,22 +293,22 @@
 			return array_keys($this->getAttributes($table, $useShortKeys));
 		}
 		
-		public function setAttribute($attribute, $value, $comparator = "=")
+		public function setAttribute($attributeName, $value, $comparator = "=")
 		{
-			list($table, $attribute) = array_values(self::parseAttribute($attribute));
-			
-			if (!Database::isValidIdentifier($attribute))
-				throw new Exception("Invalid attribute specified: " . $attribute);
-			
+			$attribute = self::parseAttributeName($attributeName);
+		
+			if (!Database::isValidIdentifier($attribute->name))
+				throw new Exception("Invalid attribute specified: " . $attribute->name);
+		
 			if (!self::isValidComparator($comparator))
 				throw new Exception("Invalid comparator specified: " . $comparator);
-						
-			$table = $this->getExistingTable($table, true);
-			
-			if (!in_array($table, $this->getTables()))
-				$this->setTable($table);
-			
-			$this->attributes[$table][strtolower($attribute)] = (object) array("value" => $value, "comparator" => $comparator);
+		
+			$attribute->table = $this->getExistingTable($attribute->table, true);
+		
+			if (!in_array($attribute->table, $this->getTables()))
+				$this->setTable($attribute->table);
+		
+			$this->attributes[$attribute->table][strtolower($attribute->name)] = (object) array("value" => $value, "comparator" => $comparator);
 			return $this;
 		}
 
@@ -333,11 +339,11 @@
 			return $this;
 		}
 		
-		public function removeAttribute($attribute)
+		public function removeAttribute($attributeName)
 		{
-			list($table, $attribute) = array_values(self::parseAttribute($attribute));
-			$table = $this->getExistingTable($table, true);
-			unset($this->attributes[$table][$attribute]);
+			$attribute = self::parseAttributeName($attributeName);
+			$attribute->table = $this->getExistingTable($attribute->table, true);
+			unset($this->attributes[$attribute->table][$attribute->name]);
 			return $this;
 		}
 		
@@ -418,23 +424,23 @@
 			}
 		}
 		
-		public function setComparator($attribute, $comparator)
+		public function setComparator($attributeName, $comparator)
 		{
-			list($table, $name) = array_values(self::parseAttribute($attribute));
-			$table = $this->getExistingTable($table, true);
-			
-			if (!isset($this->attributes[$table][$name]))
+			$attribute = self::parseAttributeName($attributeName);
+			$attribute->table = $this->getExistingTable($attribute->table, true);
+		
+			if (!isset($this->attributes[$attribute->table][$attribute->name]))
 				return $this;
-			
-			$this->setAttribute($attribute, $this->getAttribute($attribute), $comparator);
+		
+			$this->setAttribute($attributeName, $this->getAttribute($attributeName), $comparator);
 			return $this;
 		}
 		
-		public function getComparator($attribute)
-		{			
-			list($table, $attribute) = array_values(self::parseAttribute($attribute));			
-			$table = $this->getExistingTable($table, true);
-			return isset($this->attributes[$table][$attribute]) ? $this->attributes[$table][$attribute]->comparator : null;
+		public function getComparator($attributeName)
+		{
+			$attribute = self::parseAttributeName($attributeName);
+			$attribute->table = $this->getExistingTable($attribute->table, true);
+			return isset($this->attributes[$attribute->table][$attribute->name]) ? $this->attributes[$attribute->table][$attribute->name]->comparator : null;
 		}
 		
 		public function getComparators($table = "")
@@ -571,21 +577,21 @@
 			return $this;
 		}
 		
-		public function addSelect($attribute)
+		public function addSelect($attributeName)
 		{
-			list($table, $attribute) = array_values(self::parseAttribute($attribute));
-			$table = $this->getExistingTable($table, true);
+			$attribute = self::parseAttributeName($attributeName);
+			$attribute->table = $this->getExistingTable($attribute->table, true);
+		
+			if (!in_array($attribute->table, $this->getTables()))
+				$this->setTable($attribute->table);
+		
+			if (!Database::isValidIdentifier($attribute->name))
+				throw new Exception("Invalid attribute specified: " . $attribute->name);
+						
+			$attributeName = $attribute->table . "." . $attribute->name;
 			
-			if (!in_array($table, $this->getTables()))
-				$this->setTable($table);
-		
-			if (!Database::isValidIdentifier($attribute))
-				throw new Exception("Invalid attribute specified: " . $attribute);
-		
-			$attribute = strtolower($table . "." . $attribute);
-		
-			if (!in_array($attribute, $this->selects))
-				$this->selects[] = $attribute;
+			if (!in_array($attributeName, $this->selects))
+				$this->selects[] = $attributeName;
 		
 			return $this;
 		}
@@ -639,15 +645,15 @@
 			return $this;
 		}
 		
-		public function setUpdate($attribute, $value)
+		public function setUpdate($attributeName, $value)
 		{
-			list($table, $attribute) = array_values(self::parseAttribute($attribute));
-			
-			if (!Database::isValidIdentifier($attribute))
-				throw new Exception("Invalid attribute specified: " . $attribute);
-			
-			$table = $this->getExistingTable($table);
-			$this->updates[$table . "." . $attribute] = $value;
+			$attribute = self::parseAttributeName($attributeName);
+		
+			if (!Database::isValidIdentifier($attribute->name))
+				throw new Exception("Invalid attribute specified: " . $attribute->name);
+		
+			$attribute->table = $this->getExistingTable($attribute->table);
+			$this->updates[$attribute->table . "." . $attribute->name] = $value;
 			return $this;
 		}
 		
@@ -691,26 +697,26 @@
 			 */
 			if (empty($table) && !$useShortKeys)
 				return $this->updates;
-			
+		
 			$returnArray = array();
-			
-			array_walk($this->updates, function($value, $attribute) use ($table, $useShortKeys, &$returnArray)
+		
+			array_walk($this->updates, function($value, $attributeName) use ($table, $useShortKeys, &$returnArray)
 			{
-				$parts = DataModel::parseAttribute($attribute);
-				
+				$attribute = DataModel::parseAttributeName($attributeName);
+		
 				if ($useShortKeys)
-					$attribute = $parts['attribute'];
-				
+					$attributeName = $attribute->name;
+		
 				if (!empty($table))
 				{
-					if ($table == $parts['table'])
-						$returnArray[$attribute] = $value;
+					if ($table == $attribute->table)
+						$returnArray[$attributeName] = $value;
 				}
 				else
-					$returnArray[$attribute] = $value;
-					
+					$returnArray[$attributeName] = $value;
+		
 			});
-			
+		
 			return $returnArray;
 		}
 		
