@@ -29,6 +29,12 @@
 
 	class DataModel
 	{
+		/** allowed comparators for attributes.  as these are used as
+		 * 	part of a regular expression in parseAttribute(), the order
+		 * 	that they are specified here matters.
+		 */
+		const comparators = "=,!=,>=,<=,>,<,*?*,*?,?*";
+		
 		// attributes
 		protected $attributes = array();
 		protected $order = array();
@@ -39,7 +45,7 @@
 		
 		public static function isValidComparator($comparator)
 		{
-			return in_array($comparator, array("=", "!=", ">", "<", ">=", "<=", "*?*", "*?", "?*"));
+			return in_array($comparator, explode(",", self::comparators));
 		}
 		
 		public static function parseAttributeName($attributeName)
@@ -51,11 +57,50 @@
 			 * 		$attribute->name = <attribute name>
 			 */
 			$parts = explode(".", $attributeName, 2);
-			return (object) (count($parts) > 1 ? array("table" => strtolower(trim($parts[0])), "name" => strtolower(trim($parts[1]))) : array("table" => "", "name" => strtolower(trim($parts[0]))));
+			$attributeName = (object) (count($parts) > 1 ? array("table" => strtolower(trim($parts[0])), "name" => strtolower(trim($parts[1]))) : array("table" => "", "name" => strtolower(trim($parts[0]))));
+			
+			if (!empty($attributeName->table) && !Database::isValidIdentifier($attributeName->table))
+				throw new Exception("Invalid table name specified: " . $attributeName->table);
+			
+			if (!Database::isValidIdentifier($attributeName->name))
+				throw new Exception("Invalid attribute name specified: " . $attributeName->name);
+			
+			return $attributeName;
+		}
+		
+		public static function parseAttribute($attributeString)
+		{
+			/** parses $attributeString in the form:
+			 * 
+			 * 		"<attribute name> <comparator> <attribute value>"	
+			 * 
+			 *	and returns an object with the following properties:
+			 * 
+			 * 		$attribute->table = <attribute table>
+			 * 		$attribute->name = <attribute name>
+			 * 		$attribute->comparator = <attribute comparator>
+			 * 		$attribute->value = <attribute value>
+			 */
+			$parts = preg_split("/(" . preg_replace("/,/", "|", preg_quote(self::comparators)) . ")/", $attributeString, 3, PREG_SPLIT_NO_EMPTY|PREG_SPLIT_DELIM_CAPTURE);
+			
+			if (count($parts) != 3)
+				throw new Exception("Invalid attribute string specified: " . $attributeString);
+			
+			$attribute = self::parseAttributeName($parts[0]);
+			$attribute->comparator = $parts[1];
+			$attribute->value = trim($parts[2]);
+							
+			if (!self::isValidComparator($attribute->comparator))
+				throw new Exception("Invalid comparator specified: " . $attribute->comparator);
+			
+			return $attribute;
 		}
 		
 		public function __construct($tables = "")
 		{
+			if (!is_array($tables))
+				$tables = func_get_args();
+			
 			if (!empty($tables))
 				$this->setTables($tables);
 		}
@@ -116,16 +161,17 @@
 			return $this;
 		}
 		
-		public function setTables($tables)
+		public function setTables($tables = "")
 		{
+			if (!is_array($tables))
+				$tables = func_get_args();
+			
 			$backup = $this->attributes;
 			$this->clear();
 			
 			try
 			{
-				$tables = explode(",", $tables);
 				$f = array($this, "setTable");
-				
 				array_walk($tables, $f);
 			}
 			catch (Exception $ex)
@@ -177,31 +223,31 @@
 		{
 			$attribute = self::parseAttributeName($attributeName);
 			
-			if (!Database::isValidIdentifier($attribute->name))
-				throw new Exception("The attribute specified is invalid: " . $attribute->name);
+			if (empty($direction))
+				$direction = "ASC";
 			
 			if (!in_array($direction = trim($direction), array("ASC", "DESC")))
 				throw new Exception("Invalid order direction specified : " . $direction);
-			
+		
 			$attribute->table = $this->getExistingTable($attribute->table);
-			
+		
 			$this->order[$attribute->table . "." . $attribute->name] = $direction;
 			return $this;
 		}
 		
-		public function setOrder(array $order)
+		public function setOrder($orders)
 		{
-			/** $order is excpected to be an array in the format:
-			 * 
-			 * 		$order[<attribute>] = <'ASC|DESC'>
-			 */
+			if (!is_array($orders))
+				$orders = func_get_args();
+			
 			$backup = $this->order;
 			$this->clearOrder();
 		
 			try
 			{
-				array_walk($order, function($direction, $attribute, DataModel $dm)
+				array_walk($orders, function($order, $index, DataModel $dm)
 				{
+					@list($attribute, $direction) = explode(" ", $order, 2);
 					$dm->addOrder($attribute, $direction);
 				}, $this);
 			}
@@ -212,7 +258,7 @@
 			}
 		
 			return $this;
-		}	
+		}
 		
 		public function getOrder()
 		{
@@ -293,41 +339,30 @@
 			return array_keys($this->getAttributes($table, $useShortKeys));
 		}
 		
-		public function setAttribute($attributeName, $value, $comparator = "=")
+		public function setAttribute($attributeString)
 		{
-			$attribute = self::parseAttributeName($attributeName);
-		
-			if (!Database::isValidIdentifier($attribute->name))
-				throw new Exception("Invalid attribute specified: " . $attribute->name);
-		
-			if (!self::isValidComparator($comparator))
-				throw new Exception("Invalid comparator specified: " . $comparator);
-		
+			$attribute = self::parseAttribute($attributeString);
 			$attribute->table = $this->getExistingTable($attribute->table, true);
-		
+			
 			if (!in_array($attribute->table, $this->getTables()))
 				$this->setTable($attribute->table);
-		
-			$this->attributes[$attribute->table][strtolower($attribute->name)] = (object) array("value" => $value, "comparator" => $comparator);
+			
+			$this->attributes[$attribute->table][$attribute->name] = (object) array("value" => $attribute->value, "comparator" => $attribute->comparator);
 			return $this;
 		}
-
-		public function setAttributes(array $attributes)
+		
+		public function setAttributes($attributes)
 		{
-			/** sets attributes as specified in $attributes, creating new
-			 * 	tables as needed.  $attributes is expected to be an
-			 * 	associative array in the following form:
-			 * 
-			 * 		$attributes[<attribute name>] = <attribute value>
-			 */
+			if (!is_array($attributes))
+				$attributes = func_get_args();
+		
 			$backup = $this->attributes;
-			
+		
 			try
 			{
-				array_walk($attributes, function($value, $attribute, DataModel $dm)
+				array_walk($attributes, function($attribute, $index, DataModel $dm)
 				{
-					$dm->setAttribute($attribute, $value);
-					
+					$dm->setAttribute($attribute);
 				}, $this);
 			}
 			catch (Exception $ex)
@@ -335,7 +370,7 @@
 				$this->attributes = $backup;
 				throw $ex;
 			}
-			
+		
 			return $this;
 		}
 		
@@ -431,8 +466,9 @@
 		
 			if (!isset($this->attributes[$attribute->table][$attribute->name]))
 				return $this;
-		
-			$this->setAttribute($attributeName, $this->getAttribute($attributeName), $comparator);
+			
+			$this->setAttribute($attributeName . " " . $comparator . " " . $this->getAttribute($attributeName));
+			
 			return $this;
 		}
 		
@@ -548,12 +584,14 @@
 		
 		public function setTableRelationships($relationships)
 		{
+			if (!is_array($relationships))
+				$relationships = func_get_args();
+			
 			$backup = $this->tableRelationships;
 			$this->clearTableRelationships();
 			
 			try
 			{
-				$relationships = explode(",", $relationships);
 				$f = array($this, "setTableRelationship");
 				array_walk($relationships, $f);
 			}
@@ -598,13 +636,14 @@
 		
 		public function addSelects($attributes)
 		{
-			$backup = $this->selects;
+			if (!is_array($attributes))
+				$attributes = func_get_args();
 			
+			$backup = $this->selects;
+		
 			try
 			{
-				$attributes = explode(",", $attributes);
 				$f = array($this, "addSelect");
-				
 				array_walk($attributes, $f);
 			}
 			catch (Exception $ex)
@@ -612,15 +651,18 @@
 				$this->selects = $backup;
 				throw $ex;
 			}
-			
+		
 			return $this;
 		}
 		
 		public function setSelects($attributes)
 		{
+			if (!is_array($attributes))
+				$attributes = func_get_args();
+			
 			$backup = $this->selects;
 			$this->clearSelects();
-			
+		
 			try
 			{
 				$this->addSelects($attributes);
@@ -630,7 +672,7 @@
 				$this->selects = $backup;
 				throw $ex;
 			}
-			
+		
 			return $this;
 		}
 		
@@ -657,15 +699,19 @@
 			return $this;
 		}
 		
-		public function setUpdates(array $attributes)
+		public function setUpdates($updates)
 		{
-			$backup = $this->updates;
+			if (!is_array($updates))
+				$updates = func_get_args();
 			
+			$backup = $this->updates;
+		
 			try
 			{
-				array_walk($attributes, function($value, $attribute, DataModel $dm)
+				array_walk($updates, function($update, $index, DataModel $dm)
 				{
-					$dm->setUpdate($attribute, $value);
+					@list($attribute, $value) = explode("=", $update, 2);
+					$dm->setUpdate(trim($attribute), trim($value));
 				}, $this);
 			}
 			catch (Exception $ex)
@@ -673,7 +719,7 @@
 				$this->updates = $backup;
 				throw $ex;
 			}
-			
+		
 			return $this;
 		}
 		

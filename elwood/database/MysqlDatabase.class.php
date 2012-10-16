@@ -42,14 +42,17 @@
 		}
 		
 		// Override
-		public function executeQuery(DbQueryPreper $prep)
+		public function executeQuery(DbQueryPreper $prep, $getNumRowsAffected = false)
 		{
 			if (preg_match("/^SELECT/i", $prep->getQuery()))
-				return parent::executeQuery($prep);
+				return parent::executeQuery($prep, $getNumRowsAffected);
 			
 			// the MySQL PDO implementation throws a fit when $stmt->fetchAll()
-			//is called on any prepared statement that isn't a select, so we'll
+			// is called on any prepared statement that isn't a select, so we'll
 			// work around it
+			if ($this->config->isDebugMode())
+				echo "Query: " . $prep->getQueryDebug() . "\n";
+			
 			try
 			{
 				$stmt = $this->pdo->prepare($prep->getQuery());

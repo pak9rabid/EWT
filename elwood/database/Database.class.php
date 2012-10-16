@@ -210,7 +210,7 @@
 						if (count($parts) < 2)
 							$attribute = "unknown_table." . $attribute;
 						
-						$normalizedRow[$attribute] = $value;
+						$normalizedRow[] = $attribute . " = " . $value;
 					});
 					
 					$dm = new DataModel();
@@ -367,7 +367,7 @@
 			 */
 			if (!$alreadyInTransaction = $this->pdo->inTransaction())
 				$this->pdo->beginTransaction();
-			
+						
 			$db = $this;
 			$queries = array();
 			
