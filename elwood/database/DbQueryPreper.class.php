@@ -95,7 +95,7 @@
 			if (!empty($conn))
 				return $conn->executeQuery($this);
 			
-			$db = Database::getInstance(Database::getConnectionConfig());
+			$db = Database::getInstance();
 			return $db->executeQuery($this);
 		}
 	}

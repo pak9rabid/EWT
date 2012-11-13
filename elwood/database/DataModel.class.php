@@ -419,7 +419,7 @@
 				return $this->db->executeSelect($this, $query);
 			else
 			{
-				$db = Database::getInstance(Database::getConnectionConfig());
+				$db = Database::getInstance();
 				return $db->executeSelect($this, $query);
 			}
 		}
@@ -430,7 +430,7 @@
 				$this->db->executeInsert($this, $query);
 			else
 			{
-				$db = Database::getInstance(Database::getConnectionConfig());
+				$db = Database::getInstance();
 				$db->executeInsert($this, $query);
 			}
 			
@@ -443,7 +443,7 @@
 				$this->db->executeUpdate($this, $query);
 			else
 			{
-				$db = Database::getInstance(Database::getConnectionConfig());
+				$db = Database::getInstance();
 				$db->executeUpdate($this, $query);
 			}
 		}
@@ -454,7 +454,7 @@
 				return $this->db->executeDelete($this, $query);
 			else
 			{
-				$db = Database::getInstance(Database::getConnectionConfig());
+				$db = Database::getInstance();
 				return $db->executeDelete($this, $query);
 			}
 		}

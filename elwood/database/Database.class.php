@@ -26,84 +26,49 @@
 	
 	use Exception;
 	use PDO;
+	use elwood\config\Config;
+	use elwood\log\Log;
 	
 	abstract class Database
 	{
 		const SUPPORTED_DATABASE_TYPES = "mysql,pgsql,sqlite";
-		const CONNECTION_CONFIG_FILE = "db.cfg";
 		const MAX_IDENTIFIER_LENGTH = 128;
 		
 		protected $pdo;
 		protected $dsn;
 		protected $config;
 		
-		protected function __construct(ConnectionConfig $config)
+		protected function __construct(Config $config)
 		{
 			$this->config = $config;
 		}
 		
-		public static function getInstance(ConnectionConfig $config = null)
+		public static function getInstance()
 		{
-			if (empty($config))
-				$config = self::getConnectionConfig();
-			
-			switch ($config->getDatabaseType())
+			$config = Config::getInstance();
+		
+			switch ($config->getSetting(Config::OPTION_DB_TYPE))
 			{
 				case "mysql":
 					$db = new MysqlDatabase($config);
 					break;
-					
-				case "oci":
-					$db = new OracleDatabase($config);
-					break;
-					
+		
 				case "pgsql":
 					$db = new PostgresDatabase($config);
 					break;
-					
+		
 				case "sqlite":
 					$db = new SqliteDatabase($config);
 					break;
-					
+		
 				default:
 					throw new Exception("Unsupported database type specified");
 			}
-			
+		
 			$db->getPdo()->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 			return $db;
 		}
-		
-		public static function getConnectionConfig()
-		{
-			$configFile = __DIR__ . DIRECTORY_SEPARATOR . self::CONNECTION_CONFIG_FILE;
-			
-			if (!is_readable($configFile))
-				throw new Exception("Database config file ($configFile) doesn't exist or is not readable");
-			
-			// init config values
-			$config = array	(
-								"databaseType" => "",
-								"host" => "",
-								"port" => "",
-								"database" => "",
-								"username" => "",
-								"password" => "",
-								"debug" => ""
-							);
-			
-			foreach (file($configFile) as $line)
-			{
-				if (preg_match("/^(#|;)/", trim($line)))
-					// line is commented out...skip
-					continue;
-					
-				@list($key, $value) = explode("=", $line, 2);
-				$config[trim($key)] = trim($value);
-			}
-			
-			return new ConnectionConfig($config["databaseType"], $config["host"], $config["port"], $config["database"], $config["username"], $config["password"], $config["debug"]);
-		}
-		
+				
 		public static function getSupportedDatabaseTypes()
 		{
 			return explode(",", self::SUPPORTED_DATABASE_TYPES);
@@ -186,8 +151,8 @@
 		
 		public function executeQuery(DbQueryPreper $prep, $getNumRowsAffected = false)
 		{
-			if ($this->config->isDebugMode())
-				echo "Query: " . $prep->getQueryDebug() . "\n";
+			if ($this->config->getSetting(Config::OPTION_DB_DEBUG) === "true")
+				Log::writeInfo("Query: " . $prep->getQueryDebug());
 				
 			$results = array();
 			

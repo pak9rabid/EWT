@@ -109,7 +109,7 @@
 					break;
 			}
 			
-			return "<" .$eventCode . "> [" . date("m-d-Y H:i:s", $this->timestamp) . "] " . $this->message;
+			return "<" . $eventCode . "> [" . date("m-d-Y H:i:s", $this->timestamp) . "] " . $this->message;
 		}
 	}
 ?>

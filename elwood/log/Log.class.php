@@ -25,25 +25,70 @@
 	namespace elwood\log;
 	
 	use Exception;
+	use elwood\config\Config;
 	
 	class Log
 	{
-		public static function getFilePath()
+		public static function getPath()
 		{
-			return __DIR__ . DIRECTORY_SEPARATOR . "ewt-" . date("Ymd") . ".log";
+			$configPath = Config::getInstance()->getSetting(Config::OPTION_LOG_PATH);
+			
+			/** no path set (can be the case when 'log.type = system', or if logging is disabled */
+			if (empty($configPath))
+				return false;
+			
+			if (preg_match("/^(\/|[A-Za-z]:\\\\)/", $configPath))
+				/** absolute path */
+				return $configPath;
+			
+			/** relative path */
+			return implode(DIRECTORY_SEPARATOR, array(__DIR__, "..", "..", $configPath));
 		}
 		
 		public static function write(Event $event)
 		{
-			$filePath = self::getFilePath();
+			$config = Config::getInstance();
 			
-			if (!$handle = fopen($filePath, "a"))
-				throw new Exception("Unable to open log file for writing: " . $filePath);
+			if ($config->getSetting(Config::OPTION_LOG_ENABLED) !== "true")
+				return false;
 			
-			fwrite($handle, $event . "\n");
-			fclose($handle);
+			switch ($config->getSetting(Config::OPTION_LOG_TYPE))
+			{
+				case "system":
+					openlog("ewt", LOG_ODELAY, LOG_SYSLOG);
+					syslog($event->getEventType() === Event::EVENT_TYPE_INFO ? LOG_INFO :
+							$event->getEventType() === Event::EVENT_TYPE_ALERT ? LOG_ALERT :
+							$event->getEventType() === Event::EVENT_TYPE_ERROR ? LOG_ERR : LOG_NOTICE,
+							$event);
+					closelog();
+					break;
+					
+				case "rotating":
+					if (!$handle = @fopen(Log::getPath() . DIRECTORY_SEPARATOR . self::getRotatingLogFile(), "a"))
+						return false;
+					
+					fwrite($handle, $event . "\n");
+					fclose($handle);
+					break;
+					
+				case "flat":
+					if (!$handle = @fopen(Log::getPath(), "a"))
+						return false;
+					
+					fwrite($handle, $event . "\n");
+					fclose($handle);
+					break;
+					
+				default:
+					return false;
+			}
 			
 			return $event->getTimestamp();
+		}
+		
+		public static function getRotatingLogFile()
+		{
+			return "ewt-" . date("Ymd") . ".log";
 		}
 		
 		public static function writeInfo($message)

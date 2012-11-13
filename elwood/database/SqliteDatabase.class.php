@@ -24,13 +24,14 @@
 
 	namespace elwood\database;
 	use PDO;
+	use elwood\config\Config;
 	
 	class SqliteDatabase extends Database
 	{
-		public function __construct(ConnectionConfig $config)
+		public function __construct(Config $config)
 		{
 			parent::__construct($config);
-			$this->dsn = "sqlite:" . $config->getDatabase();
+			$this->dsn = "sqlite:" . $config->getSetting(Config::OPTION_DB_DATABASE);
 			$this->pdo = new PDO($this->dsn);
 			$this->pdo->exec("PRAGMA foreign_keys = ON");
 		}

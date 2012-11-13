@@ -24,7 +24,7 @@
 
 	namespace elwood\config;
 	
-	use \Exception;
+	use Exception;
 	
 	final class Config
 	{
@@ -32,13 +32,13 @@
 		const APC_CACHE_CONFIG_KEY = "EWT_CONFIG";
 		
 		/** config file options */
-		const OPTION_DATABASE_TYPE = "db.type";
-		const OPTION_DATABASE_HOST = "db.host";
-		const OPTION_DATABASE_PORT = "db.port";
-		const OPTION_DATABASE_DATABASE = "db.database";
-		const OPTION_DATABASE_USERNAME = "db.username";
-		const OPTION_DATABASE_PASSWORD = "db.password";
-		const OPTION_DATABASE_DEBUG = "db.debug";
+		const OPTION_DB_TYPE = "db.type";
+		const OPTION_DB_HOST = "db.host";
+		const OPTION_DB_PORT = "db.port";
+		const OPTION_DB_DATABASE = "db.database";
+		const OPTION_DB_USERNAME = "db.username";
+		const OPTION_DB_PASSWORD = "db.password";
+		const OPTION_DB_DEBUG = "db.debug";
 		const OPTION_LOG_ENABLED = "log.enabled";
 		const OPTION_LOG_TYPE = "log.type";
 		const OPTION_LOG_PATH = "log.path";
@@ -50,7 +50,7 @@
 		{
 			if (function_exists("apc_exists") && function_exists("apc_fetch") && function_exists("apc_store"))
 			{
-				/** APC is enabled...attempt to pull config from the APC cache */
+				/** APC is installed...attempt to pull config from the APC cache */
 				if (apc_exists(self::APC_CACHE_CONFIG_KEY))
 				{
 					$config = apc_fetch(self::APC_CACHE_CONFIG_KEY);
@@ -83,12 +83,12 @@
 				"db.database" => "",
 				"db.username" => "",
 				"db.password" => "",
-				"db.debug" => false,
+				"db.debug" => "false",
 				
 				/** logging options */
-				"log.enabled" => true,
-				"log.type" => "system",
-				"log.path" => ""
+				"log.enabled" => "true",
+				"log.type" => "rotating",
+				"log.path" => "logs"
 			);
 		}
 		
@@ -106,7 +106,7 @@
 				$line = trim($line);
 				
 				if (empty($line) || preg_match("/^(#|;)/", $line))
-					// line is empty or commented out...skip
+					/** line is empty or commented out...skip */
 					continue;
 				
 				@list($key, $value) = explode("=", $line, 2);

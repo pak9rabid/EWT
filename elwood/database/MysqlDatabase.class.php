@@ -26,19 +26,21 @@
 	
 	use Exception;
 	use PDO;
+	use elwood\config\Config;
+	use elwood\log\Log;
 	
 	class MysqlDatabase extends Database
 	{
 		const DEFAULT_PORT = 3306;
 		
-		public function __construct(ConnectionConfig $config)
+		public function __construct(Config $config)
 		{
 			parent::__construct($config);
-			$port = $config->getPort();
+			$port = $config->getSetting(Config::OPTION_DB_PORT);
 			$port = empty($port) ? self::DEFAULT_PORT : $port;
-			
-			$this->dsn = "mysql:host=" . $config->getHost() . ";port=" . $port . ";dbname=" . $config->getDatabase();
-			$this->pdo = new PDO($this->dsn, $config->getUsername(), $config->getPassword(), array(PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8"));
+		
+			$this->dsn = "mysql:host=" . $config->getSetting(Config::OPTION_DB_HOST) . ";port=" . $port . ";dbname=" . $config->getSetting(Config::OPTION_DB_DATABASE);
+			$this->pdo = new PDO($this->dsn, $config->getSetting(Config::OPTION_DB_USERNAME), $config->getSetting(Config::OPTION_DB_PASSWORD), array(PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8"));
 		}
 		
 		// Override
@@ -50,8 +52,8 @@
 			// the MySQL PDO implementation throws a fit when $stmt->fetchAll()
 			// is called on any prepared statement that isn't a select, so we'll
 			// work around it
-			if ($this->config->isDebugMode())
-				echo "Query: " . $prep->getQueryDebug() . "\n";
+			if ($this->config->getSetting(Config::OPTION_DB_DEBUG) === "true")
+				Log::writeInfo("Query: " . $prep->getQueryDebug());
 			
 			try
 			{

@@ -24,19 +24,20 @@
 
 	namespace elwood\database;
 	use PDO;
+	use elwood\config\Config;
 	
 	class PostgresDatabase extends Database
 	{
 		const DEFAULT_PORT = 5432;
 		
-		public function __construct(ConnectionConfig $config)
+		public function __construct(Config $config)
 		{
 			parent::__construct($config);
-			$port = $config->getPort();
+			$port = $config->getSetting(Config::OPTION_DB_PORT);
 			$port = empty($port) ? self::DEFAULT_PORT : $port;
-			
-			$this->dsn = "pgsql:host=" . $config->getHost() . ";port=" . $port . ";dbname=" . $config->getDatabase();
-			$this->pdo = new PDO($this->dsn, $config->getUsername(), $config->getPassword());
+		
+			$this->dsn = "pgsql:host=" . $config->getSetting(Config::OPTION_DB_HOST) . ";port=" . $port . ";dbname=" . $config->getSetting(Config::OPTION_DB_DATABASE);
+			$this->pdo = new PDO($this->dsn, $config->getSetting(Config::OPTION_DB_USERNAME), $config->getSetting(Config::OPTION_DB_PASSWORD));
 		}
 	}
 ?>
