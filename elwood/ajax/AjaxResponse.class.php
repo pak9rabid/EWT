@@ -24,37 +24,83 @@
 
 	namespace elwood\ajax;
 	
+	/**
+	 * Ajax response
+	 * 
+	 * A response from an ajax request handler
+	 * 
+	 * @author Patrick Griffin <pak9rabid@yahoo.com>
+	 */
 	class AjaxResponse
 	{
 		protected $data;
 		protected $errors = array();
 	
+		/**
+		 * Constructor
+		 * 
+		 * Constructs an ajax response
+		 * 
+		 * @param string $data Data to be encapsulated in the ajax response
+		 * @param array $errors Errors to be encapsulated in the ajax response
+		 */
 		public function __construct($data = "", array $errors = array())
 		{
 			$this->data = $data;
 			$this->errors = $errors;
 		}
 	
+		/**
+		 * Determines if the ajax response contains errors
+		 * 
+		 * @return boolean true if the response contains errors, false otherwise
+		 */
 		public function hasErrors()
 		{
 			return count($this->errors) > 0;
 		}
 	
+		/**
+		 * Get ajax response text
+		 * 
+		 * @return string Returns the response text associated with the ajax response
+		 */
 		public function getResponseText()
 		{
 			return $this->data;
 		}
 	
+		/**
+		 * Set response errors
+		 * 
+		 * Set a list of response errors associated with the ajax response
+		 * 
+		 * @param array $errors A list of errors
+		 */
 		public function setErrors(array $errors)
 		{
 			$this->errors = $errors;
 		}
 	
+		/**
+		 * Set response data
+		 * 
+		 * Set the response string associated with the ajax response
+		 * 
+		 * @param string $data
+		 */
 		public function setData($data)
 		{
 			$this->data = $data;
 		}
 	
+		/**
+		 * JSON-encode the ajax response
+		 * 
+		 * Encodes the properties of the ajax response as a JSON object
+		 * 
+		 * @return string A JSON representation of the ajax response
+		 */
 		public function toJson()
 		{
 			foreach ($this as $key => $value)

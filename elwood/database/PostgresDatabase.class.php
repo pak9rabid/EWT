@@ -33,11 +33,24 @@
 		public function __construct(Config $config)
 		{
 			parent::__construct($config);
-			$port = $config->getSetting(Config::OPTION_DB_PORT);
-			$port = empty($port) ? self::DEFAULT_PORT : $port;
-		
-			$this->dsn = "pgsql:host=" . $config->getSetting(Config::OPTION_DB_HOST) . ";port=" . $port . ";dbname=" . $config->getSetting(Config::OPTION_DB_DATABASE);
-			$this->pdo = new PDO($this->dsn, $config->getSetting(Config::OPTION_DB_USERNAME), $config->getSetting(Config::OPTION_DB_PASSWORD));
+			
+			$dbSettings = array
+			(
+				"host" => $config->getSetting(Config::OPTION_DB_HOST),
+				"port" => $config->getSetting(Config::OPTION_DB_PORT),
+				"dbname" => $config->getSetting(Config::OPTION_DB_DATABASE),
+				"user" => $config->getSetting(Config::OPTION_DB_USERNAME),
+				"password" => $config->getSetting(Config::OPTION_DB_PASSWORD)
+			);
+			
+			if (empty($dbSettings["host"]))
+				$dbSettings["port"] = "";
+			
+			if (!empty($dbSettings["host"]) && empty($dbSettings["port"]))
+				$dbSettings["port"] = self::DEFAULT_PORT;
+			
+			$this->dsn = "pgsql:" . http_build_query(array_filter($dbSettings), "", ";");
+			$this->pdo = new PDO($this->dsn);
 		}
 	}
 ?>

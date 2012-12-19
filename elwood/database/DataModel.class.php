@@ -27,35 +27,64 @@
 	use stdClass;
 	use Exception;
 
+	/**
+	 * An object representation of a database row
+	 * 
+	 * In it's simplest form, a DataModel object is an elaborate hashmap that
+	 * maps column names from one or more database tables to values.  Once its
+	 * attributes have been set, a DataModel object could then be used to
+	 * execute queries against a database without having to write any SQL
+	 * manually.
+	 * 
+	 * @author Patrick Griffin <pak9rabid@yahoo.com>
+	 */
+	
 	class DataModel
 	{
-		/** allowed comparators for attributes.  as these are used as
-		 * 	part of a regular expression in parseAttribute(), the order
-		 * 	that they are specified here matters.
+		/**
+		 * Valid comparators
+		 * 
+		 * Valid comparators for set attributes.
 		 */
-		const comparators = "=,!=,>=,<=,>,<,*?*,*?,?*";
+		const comparators = "=,!=,>=,<=,>,<,*?*,*?,?*";	/** These are used as part of a regular
+														 * expression in parseAttribute(), so the
+														 * order that they are specified here matters.
+														 */
 		
-		// attributes
 		protected $attributes = array();
 		protected $order = array();
 		protected $tableRelationships = array();
 		protected $selects = array();
 		protected $updates = array();
-		protected $db;
+		protected $db = null;
 		
+		/**
+		 * Validates a comparator
+		 * 
+		 * @param string $comparator The comparator to validate
+		 * @return boolean true if $comparator is valid, false otherwise
+		 */
 		public static function isValidComparator($comparator)
 		{
 			return in_array($comparator, explode(",", self::comparators));
 		}
 		
+		/**
+		 * Parses an attribute name
+		 * 
+		 * Parses an attribute name (either a standalone or fully-
+		 * qualified name) and returns an object representation of it in the
+		 * following form:
+		 *    
+		 *    $attribute->table = <table name>
+		 *    $attribute->name = <attribute name>
+		 *    
+		 * @param string $attributeName A standalone or fully-qualified attribute name
+		 * @throws Exception If the table or attribute name are invalid database identifiers
+		 * @return stdClass Object representation of the attribute name
+		 */
 		public static function parseAttributeName($attributeName)
 		{
-			/** parses $attributeName and returns an object
-			 * 	with the following properties:
-			 * 		
-			 * 		$attribute->table = <attribute table>
-			 * 		$attribute->name = <attribute name>
-			 */
 			$parts = explode(".", $attributeName, 2);
 			$attributeName = (object) (count($parts) > 1 ? array("table" => strtolower(trim($parts[0])), "name" => strtolower(trim($parts[1]))) : array("table" => "", "name" => strtolower(trim($parts[0]))));
 			
@@ -68,20 +97,27 @@
 			return $attributeName;
 		}
 		
+		/**
+		 * Parses an attribute key/value relationship
+		 * 
+		 * Parses $attributeString, which should be in the following form:
+		 *    
+		 *    <attribute name> <comparator> <attribute value>
+		 *    
+		 * and returns an object representation of it with the following properties:
+		 * 
+		 *    $attribute->table
+		 *    $attribute->name
+		 *    $attribute->comparator
+		 *    $attribute->value
+		 * 
+		 * @param string $attributeString A key/value pair with a comparator, in the form: <attribute name> <comparator> <attribute value>
+		 * @throws Exception If an invalid $attributeString is specified
+		 * @return stdClass Object representation of the attributes table, name, comparator, and value
+		 */
 		public static function parseAttribute($attributeString)
 		{
-			/** parses $attributeString in the form:
-			 * 
-			 * 		"<attribute name> <comparator> <attribute value>"	
-			 * 
-			 *	and returns an object with the following properties:
-			 * 
-			 * 		$attribute->table = <attribute table>
-			 * 		$attribute->name = <attribute name>
-			 * 		$attribute->comparator = <attribute comparator>
-			 * 		$attribute->value = <attribute value>
-			 */
-			$parts = preg_split("/(" . preg_replace("/,/", "|", preg_quote(self::comparators)) . ")/", $attributeString, 3, PREG_SPLIT_NO_EMPTY|PREG_SPLIT_DELIM_CAPTURE);
+			$parts = preg_split("/(" . preg_replace("/,/", "|", preg_quote(self::comparators)) . ")+/", $attributeString, 2, PREG_SPLIT_NO_EMPTY|PREG_SPLIT_DELIM_CAPTURE);
 			
 			if (count($parts) != 3)
 				throw new Exception("Invalid attribute string specified: " . $attributeString);
@@ -89,13 +125,24 @@
 			$attribute = self::parseAttributeName($parts[0]);
 			$attribute->comparator = $parts[1];
 			$attribute->value = trim($parts[2]);
-							
+			
 			if (!self::isValidComparator($attribute->comparator))
 				throw new Exception("Invalid comparator specified: " . $attribute->comparator);
 			
 			return $attribute;
 		}
 		
+		/**
+		 * Constructor
+		 * 
+		 * Creates a new DataModel object, initializing it with any specified
+		 * tables
+		 * 
+		 * @param mixed $tables A list of tables to initialize the DataModel with.
+		 *              This can be an array containing a list of table names, or a
+		 *              variable list of arguments, with each argument being a table
+		 *              name.
+		 */
 		public function __construct($tables = "")
 		{
 			if (!is_array($tables))
@@ -104,8 +151,16 @@
 			if (!empty($tables))
 				$this->setTables($tables);
 		}
-
-		// methods
+		
+		/**
+		 * To String
+		 * 
+		 * Returns a string representation of this DataModel object
+		 * 
+		 * @return string A string representation of this DataModel object,
+		 *                displaying all set attributes and associated
+		 *                comparators.
+		 */
 		public function __toString()
 		{
 			$dm = $this;
@@ -131,22 +186,55 @@
 					"}";
 		}
 		
+		/**
+		 * JSON-encode
+		 * 
+		 * JSON-encode all set attributes
+		 * 
+		 * @return string JSON-encoded attributes
+		 */
 		public function toJson()
 		{
 			return json_encode($this->attributes);
 		}
 		
+		/**
+		 * Set database connection
+		 * 
+		 * Set a connection for this object to use when executing queries.
+		 * This is useful for when one might want to run a series of queries
+		 * as a single, atomic transaction.
+		 * 
+		 * @param Database $db
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function setConnection(Database $db)
 		{
 			$this->db = $db;
 			return $this;
 		}
 		
+		/**
+		 * Get the database connection
+		 * 
+		 * Get the database connection set for this instance
+		 * 
+		 * @return Database The database connection, or null if none was set
+		 */
 		public function getConnection()
 		{
 			return $this->db;
 		}
 		
+		/**
+		 * Set and initialize a table
+		 * 
+		 * Creates an entry for a table, clearing any previously-set attributes
+		 * 
+		 * @param string $table A table name
+		 * @throws Exception If an invalid table name is specified
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function setTable($table)
 		{
 			$table = trim($table);
@@ -161,6 +249,20 @@
 			return $this;
 		}
 		
+		/**
+		 * Set and initialize a list of tables
+		 * 
+		 * Creates an entry for a list of tables, clearing any previously-set
+		 * attributes.
+		 * 
+		 * @param mixed $tables A list of tables to set.  This can be either an
+		 *                      array containing a list of table names, or a
+		 *                      variable list of arguments, with each argument
+		 *                      being a table name.
+		 *                      
+		 * @throws Exception If an invalid table name is specified
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function setTables($tables = "")
 		{
 			if (!is_array($tables))
@@ -182,7 +284,16 @@
 			
 			return $this;
 		}
-			
+		
+		/**
+		 * Remove a table
+		 * 
+		 * Removes a table and all associated attributes, table relationships,
+		 * selects, orders, and updates.
+		 * 
+		 * @param string $table Name of the table to remove
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function removeTable($table)
 		{
 			unset($this->attributes[strtolower($table)]);
@@ -214,11 +325,31 @@
 			return $this;
 		}
 		
+		/**
+		 * Get table names
+		 * 
+		 * Gets a list of all set tables
+		 * 
+		 * @return array A list of all set table names
+		 */
 		public function getTables()
 		{
 			return array_keys($this->attributes);
 		}
 		
+		/**
+		 * Add a sort order
+		 * 
+		 * Adds a sort order for the specified attribute.  Sort orders are used
+		 * to sort results when executeSelect() is called.
+		 * 
+		 * @param string $attributeName Attribute to order the results by
+		 * @param string $direction Order direction.  Valid values are "ASC"
+		 *    (for ascending order) and "DESC" (for descending order).  If
+		 *    omitted, a direction of 'ASC' is assumed.
+		 * @throws Exception If an invalid order direction is specified
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function addOrder($attributeName, $direction = "ASC")
 		{
 			$attribute = self::parseAttributeName($attributeName);
@@ -235,6 +366,23 @@
 			return $this;
 		}
 		
+		/**
+		 * Set sort order
+		 * 
+		 * Sets the sort order, clearing any previously set ordering.
+		 * 
+		 * @param mixed $orders A list of attributes and sort directions to
+		 *    order the results when executeSelect() is called.  This can be
+		 *    an array containing a list of sort orders, or a variable list of
+		 *    arguments, with each argument being a sort order.  Sort orders
+		 *    are expected to be in the format:<br><br>
+		 *    
+		 *       attributeName [direction]<br><br>
+		 *       
+		 *    If ommitted, a direction of 'ASC' is assumed.
+		 * @throws Exception If an invalid order direction is specified
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function setOrder($orders)
 		{
 			if (!is_array($orders))
@@ -260,11 +408,27 @@
 			return $this;
 		}
 		
+		/**
+		 * Get order
+		 * 
+		 * Gets the set ordering.
+		 * 
+		 * @return array The order
+		 */
 		public function getOrder()
 		{
 			return $this->order;
 		}
 		
+		/**
+		 * Remove a sort order
+		 * 
+		 * Removes the specified sort order.
+		 * 
+		 * @param string $attributeName The name of the attribute to remove
+		 *    sorting on
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function removeOrder($attributeName)
 		{
 			$attribute = self::parseAttributeName($attributeName);
@@ -273,12 +437,28 @@
 			return $this;
 		}
 		
+		/**
+		 * Clear ordering
+		 * 
+		 * Removes all set ordering
+		 * 
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function clearOrder()
 		{
 			$this->order = array();
 			return $this;
 		}
 		
+		/**
+		 * Get an attribute value
+		 * 
+		 * Gets the specified attribute value.
+		 * 
+		 * @param string $attributeName Attribute whose value to retreive
+		 * @return The value of the specified attribute, or null of the
+		 *    specified attribute is not set
+		 */
 		public function getAttribute($attributeName)
 		{
 			if (empty($attributeName))
@@ -289,13 +469,27 @@
 			return isset($this->attributes[$attribute->table][$attribute->name]) ? $this->attributes[$attribute->table][$attribute->name]->value : null;
 		}
 		
+		/**
+		 * Get a list of attributes
+		 * 
+		 * Gets a list of set attributes, optionally limiting results to a
+		 * specific table.
+		 * 
+		 * @param string $table If set, will only retreive attributes from the
+		 *    specified table
+		 * @param boolean $useShortKeys If true, the returned array will omit
+		 *    the table name from the attribute key.
+		 *    <br><br>
+		 *    <b>WARNING:</b> If this is set to true and there are multiple
+		 *    tables that contain the same attribute name, the last entry will
+		 *    overwrite the previous entry in the returned array.
+		 * @return array An array containing attribute names and values in the
+		 *    format:<br><br>
+		 *    
+		 *    $attributes[attributeName] = attributeValue
+		 */
 		public function getAttributes($table = "", $useShortKeys = false)
 		{
-			/**
-			 * WARNING:	if $useShortKeys is set to true and there are multiple tables that
-			 *  		contain the same attribute name, the last entry will overwrite the
-			 *  		previous entry in the returned array
-			 */
 			$returnAttributes = array();
 			
 			$f = function(array $attributes, $table) use ($useShortKeys, &$returnAttributes)
@@ -333,12 +527,36 @@
 			array_walk($this->attributes, $f);
 			return $returnAttributes;
 		}
-				
+		
+		/**
+		 * Get a list of attribute names
+		 * 
+		 * Gets a list of set attribute names, optionally limiting results to a
+		 * specific table.
+		 * 
+		 * @param string $table If set, will only retreive attribute names from
+		 *    the specified table.
+		 * @param boolean $useShortKeys If true, the returned array will omit
+		 *    the table name from the attribute name.
+		 * @return array An array containing the list of attribute names
+		 */
 		public function getAttributeKeys($table = "", $useShortKeys = false)
 		{
 			return array_keys($this->getAttributes($table, $useShortKeys));
 		}
 		
+		/**
+		 * Set an attribute
+		 * 
+		 * Sets an attribute's name, comparator, and value.
+		 * 
+		 * @param string $attributeString Attribute string in the following format:<br><br>
+		 * 
+		 *    '[tableName].attributeName comparator attributeValue'<br><br>
+		 *    
+		 *    'comparator' is one of: =, !=, >=, <=, >, <, \*?\*, \*?, ?\*
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function setAttribute($attributeString)
 		{
 			$attribute = self::parseAttribute($attributeString);
@@ -351,6 +569,17 @@
 			return $this;
 		}
 		
+		/**
+		 * Set a list of attributes
+		 * 
+		 * Sets a list of attributes at once.
+		 * 
+		 * @param mixed $attributes A list of attributes to set.  This can be 
+		 *    an array containing a list of attributes, or a variable list of
+		 *    arguments, wich each argument being an attribute string.  See
+		 *    setAttribute() for details on how the attribute string should be
+		 *    formatted.
+		 */
 		public function setAttributes($attributes)
 		{
 			if (!is_array($attributes))

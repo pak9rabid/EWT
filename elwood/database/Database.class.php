@@ -29,20 +29,63 @@
 	use elwood\config\Config;
 	use elwood\log\Log;
 	
+	/**
+	 * A connection to a database
+	 * 
+	 * This is an abstract class that provides common functionality for all of
+	 * the supported database systems.  All supported database systems must subclass
+	 * this class
+	 * 
+	 * @author Patrick Griffin <pak9rabid@yahoo.com>
+	 */
+	
 	abstract class Database
 	{
+		/**
+		 * SUPPORTED_DATABASE_TYPES
+		 * 
+		 * Contains a comma-separeted list of supported database systems
+		 * 
+		 * @var string
+		 */
 		const SUPPORTED_DATABASE_TYPES = "mysql,pgsql,sqlite";
+		
+		/**
+		 * MAX_IDENTIFIER_LENGTH
+		 * 
+		 * Contains the maximum allowed character length that a database
+		 * system can use for various identifiers (table names, indexes, constraints, etc).
+		 * 
+		 * @var int
+		 */
 		const MAX_IDENTIFIER_LENGTH = 128;
 		
 		protected $pdo;
 		protected $dsn;
 		protected $config;
 		
+		/**
+		 * Constructor
+		 * 
+		 * This is generally called by extending classes to perform initialization common to
+		 * all Database-derived classes
+		 * 
+		 * @param Config $config EWT configuration
+		 */
 		protected function __construct(Config $config)
 		{
 			$this->config = $config;
 		}
 		
+		/**
+		 * Gets a database connection
+		 * 
+		 * This gets an instance of a database connection of the database specified in the EWT
+		 * configuration file
+		 * 
+		 * @return Database A connection to a specific database type
+		 * @throws Exception If an unsupported database type is specified in the EWT configuration file
+		 */
 		public static function getInstance()
 		{
 			$config = Config::getInstance();
@@ -68,12 +111,25 @@
 			$db->getPdo()->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 			return $db;
 		}
-				
+		
+		/**
+		 * Gets a list of supported database types
+		 * 
+		 * @return array A list of supported database types
+		 */
 		public static function getSupportedDatabaseTypes()
 		{
 			return explode(",", self::SUPPORTED_DATABASE_TYPES);
 		}
 		
+		/**
+		 * Verifies a port number
+		 * 
+		 * Verifies if $port is a valid TCP/UDP port number
+		 * 
+		 * @param int $port The port number to verify
+		 * @return boolean true if $port is a valid port number, false otherwise
+		 */
 		public static function isValidIanaPortNumber($port)
 		{
 			if (!preg_match("/^[0-9]{1,5}$/", $port))
@@ -85,6 +141,15 @@
 			return true;
 		}
 		
+		/**
+		 * Verifies a database identifier is valid
+		 * 
+		 * Verifies if $identifier is a valid database identifier.  Database identifiers are names
+		 * for database objects (tables, columns, indexes, constraints, etc).
+		 * 
+		 * @param string $identifier Identifier to validate
+		 * @return boolean true if $identifier is valid, false otherwise
+		 */
 		public static function isValidIdentifier($identifier)
 		{
 			// database identifiers are names given to various named objects (tables, columns, constraints, indexes, etc)
@@ -97,6 +162,17 @@
 			return true;
 		}
 		
+		/**
+		 * Generates a prepared WHERE clause
+		 * 
+		 * Given the specified $dm, this method will generate a prepared SQL WHERE clause
+		 * based on its set attributes and optionally append it to $prep (if specified).
+		 * 
+		 * @param DataModel $dm DataModel object to generate SQL WHERE clause from
+		 * @param DbQueryPreper $prep Optional.  If specified, it will append the generated WHERE clause to it
+		 * @param string $table Optional.  If specified, the generated WHERE clause will be limited to the specified table's attributes
+		 * @return string SQL containing the prepared WHERE clause
+		 */
 		public function dataModelToParamaterizedWhereClause(DataModel $dm, DbQueryPreper $prep = null, $table = "")
 		{
 			$conditions = array();
@@ -149,6 +225,17 @@
 			return $sql;
 		}
 		
+		/**
+		 * Execute a prepared SQL query
+		 * 
+		 * Executes $prep as a prepared SQL statement, binding any set variables
+		 * during query execution
+		 * 
+		 * @param DbQueryPreper $prep The prepared SQL query
+		 * @param boolean $getNumRowsAffected If set to true, will return a count of the rows affected by the executed query
+		 * @throws SQLException If execution of the query fails
+		 * @return int|array A count of affected rows if $getNumRowsAffected is true, otherwise an array of DataModel objects representing the result set of the query
+		 */
 		public function executeQuery(DbQueryPreper $prep, $getNumRowsAffected = false)
 		{
 			if ($this->config->getSetting(Config::OPTION_DB_DEBUG) === "true")
@@ -186,6 +273,7 @@
 			}
 			catch (Exception $ex)
 			{
+				Log::writeError($ex);
 				$errorInfo = $this->pdo->errorInfo();
 				$errorCode = $errorInfo[0];
 				$errorMessage = $errorInfo[2];
@@ -194,6 +282,16 @@
 			}
 		}
 		
+		/**
+		 * Executes a SELECT database query
+		 * 
+		 * Generates and executes a SELECT database query based on properties set in $dm
+		 * 
+		 * @param DataModel $dm The DataModel object to build the query from
+		 * @param string $query If not null, the generated query will be placed here
+		 * @throws Exception If $dm has no tables set
+		 * @return array An array of DataModel objects representing the result set of the query
+		 */
 		public function executeSelect(DataModel $dm, &$query = null)
 		{
 			$tables = $dm->getTables();
@@ -225,6 +323,15 @@
 			return $this->executeQuery($prep);
 		}
 		
+		/**
+		 * Execute an INSERT database query
+		 * 
+		 * Generates and executes an INSERT database query based on the attributes set in $dm
+		 * 
+		 * @param DataModel $dm The DataModel object to build the query from
+		 * @param string $query If not null, the generated query will be placed here
+		 * @throws Exception If an error is encountered when executing the query
+		 */
 		public function executeInsert(DataModel $dm, &$query = null)
 		{
 			/** iterates through all tables specified in $dm and inserts all set attributes
@@ -273,6 +380,15 @@
 				$query = implode("\n", $queries);
 		}
 		
+		/**
+		 * Execute an UPDATE database query
+		 * 
+		 * Generates and exectues an UPDATE database query based on the attributes set in $dm
+		 * 
+		 * @param DataModel $dm The DataModel object to build the query from
+		 * @param string $query If not null, the generated query will be placed here
+		 * @throws Exception If an error is encountered when executing the query
+		 */
 		public function executeUpdate(DataModel $dm, &$query = null)
 		{
 			/** iterates through all tables in $dm and updates
@@ -324,6 +440,15 @@
 				$query = implode("\n", $queries);
 		}
 		
+		/**
+		 * Execute a DELETE database query
+		 *
+		 * Generates and exectues a DELETE database query based on the attributes set in $dm
+		 *
+		 * @param DataModel $dm The DataModel object to build the query from
+		 * @param string $query If not null, the generated query will be placed here
+		 * @throws Exception If an error is encountered when executing the query
+		 */
 		public function executeDelete(DataModel $dm, &$query = null)
 		{
 			/** iterates through all tables in $dm and removes
@@ -364,19 +489,28 @@
 				$query = implode("\n", $queries);
 		}
 		
+		/**
+		 * Get PDO object
+		 * 
+		 * Gets the PDO object associated with this database connection
+		 * 
+		 * @return PDO The PDO object associated with this database connection
+		 */
 		public function getPdo()
 		{
 			return $this->pdo;
 		}
 		
+		/**
+		 * Get the Data Source Name (DSN)
+		 * 
+		 * Gets the DSN string associated with this database connection
+		 * 
+		 * @return string The DSN associated with this database connection
+		 */
 		public function getDsn()
 		{
 			return $this->dsn;
-		}
-		
-		public function getConfig()
-		{
-			return $this->config;
 		}
 	}
 ?>

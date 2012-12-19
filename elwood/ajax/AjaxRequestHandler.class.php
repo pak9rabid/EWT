@@ -24,9 +24,33 @@
 
 	namespace elwood\ajax;
 	
+	/**
+	 * Top-level interface for all ajax request handlers.
+	 * 
+	 * All ajax request handlers must implement this interface.
+	 * 
+	 * @author Patrick Griffin <pak9rabid@yahoo.com>
+	 */
 	interface AjaxRequestHandler
 	{
+		/**
+		 * Process the ajax request
+		 * 
+		 * Processes the incoming ajax request.
+		 * 
+		 * @param array $parameters A copy of the $_REQUEST superglobal array
+		 * @return AjaxResponse The ajax response
+		 */
 		public function processRequest(array $parameters);
+		
+		/**
+		 * Restricts the ajax request handler
+		 * 
+		 * A restricted ajax request handler can only be executed by a user that has an active session
+		 * 
+		 * @param array $parameters A copy of the $_REQUEST superglobal array
+		 * @return boolean true if the ajax request handler is restricted, false otherwise
+		 */
 		public function isRestricted(array $parameters);
 	}
 ?>

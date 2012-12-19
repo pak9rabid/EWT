@@ -26,26 +26,138 @@
 	
 	use Exception;
 	
+	/**
+	 * Access configuration settings
+	 * 
+	 * A class that represents configuration settings as specified in
+	 * the EWT configuration file.
+	 * 
+	 * @author Patrick Griffin <pak9rabid@yahoo.com>
+	 */
+	
 	final class Config
 	{
+		/**
+		 * CONFIG_FILE
+		 * 
+		 * Name of the EWT configuration file
+		 * 
+		 * @var string
+		 */
 		const CONFIG_FILE = "ewt.cfg";
+		
+		/**
+		 * APC_CACHE_CONFIG_KEY
+		 * 
+		 * Key used to cache the Config object with APC
+		 * 
+		 * @var string
+		 */
 		const APC_CACHE_CONFIG_KEY = "EWT_CONFIG";
 		
 		/** config file options */
+		
+		/**
+		 * OPTION_DB_TYPE
+		 * 
+		 * Convenience constant for the configuration option 'db.type'
+		 * 
+		 * @var string
+		 */
 		const OPTION_DB_TYPE = "db.type";
+		
+		/**
+		 * OPTION_DB_HOST
+		 *
+		 * Convenience constant for the configuration option 'db.host'
+		 *
+		 * @var string
+		 */
 		const OPTION_DB_HOST = "db.host";
+		
+		/**
+		 * OPTION_DB_PORT
+		 *
+		 * Convenience constant for the configuration option 'db.port'
+		 *
+		 * @var string
+		 */
 		const OPTION_DB_PORT = "db.port";
+		
+		/**
+		 * OPTION_DB_DATABASE
+		 *
+		 * Convenience constant for the configuration option 'db.database'
+		 *
+		 * @var string
+		 */
 		const OPTION_DB_DATABASE = "db.database";
+		
+		/**
+		 * OPTION_DB_USERNAME
+		 *
+		 * Convenience constant for the configuration option 'db.username'
+		 *
+		 * @var string
+		 */
 		const OPTION_DB_USERNAME = "db.username";
+		
+		/**
+		 * OPTION_DB_PASSWORD
+		 *
+		 * Convenience constant for the configuration option 'db.password'
+		 *
+		 * @var string
+		 */
 		const OPTION_DB_PASSWORD = "db.password";
+		
+		/**
+		 * OPTION_DB_DEBUG
+		 *
+		 * Convenience constant for the configuration option 'db.debug'
+		 *
+		 * @var string
+		 */
 		const OPTION_DB_DEBUG = "db.debug";
+		
+		/**
+		 * OPTION_LOG_ENABLED
+		 *
+		 * Convenience constant for the configuration option 'log.enabled'
+		 *
+		 * @var string
+		 */
 		const OPTION_LOG_ENABLED = "log.enabled";
+		
+		/**
+		 * OPTION_LOG_TYPE
+		 *
+		 * Convenience constant for the configuration option 'log.type'
+		 *
+		 * @var string
+		 */
 		const OPTION_LOG_TYPE = "log.type";
+		
+		/**
+		 * OPTION_LOG_PATH
+		 *
+		 * Convenience constant for the configuration option 'log.path'
+		 *
+		 * @var string
+		 */
 		const OPTION_LOG_PATH = "log.path";
 		
 		private $config;
 		private $checksum;
 		
+		/**
+		 * Get Config instance
+		 * 
+		 * Gets the current EWT configuration as set in the EWT configuration file. This method
+		 * makes use of APC caching when available.
+		 * 
+		 * @return Config
+		 */
 		public static function getInstance()
 		{
 			if (function_exists("apc_exists") && function_exists("apc_fetch") && function_exists("apc_store"))
@@ -67,18 +179,32 @@
 			return new Config();
 		}
 		
+		/**
+		 * Path to EWT configuration file
+		 * 
+		 * Gets the path to the EWT configuration file
+		 * 
+		 * @return string Path to the EWT configuration file
+		 */
 		public static function configFilePath()
 		{		
 			return implode(DIRECTORY_SEPARATOR, array(__DIR__, "..", "..", self::CONFIG_FILE));
 		}
 		
+		/**
+		 * Get the default EWT configuration
+		 * 
+		 * Gets the default EWT configuration
+		 * 
+		 * @return array Default configuration settings
+		 */
 		private static function defaultConfig()
 		{
 			return array
 			(
 				/** database options */
 				"db.type" => "",
-				"db.host" => "localhost",
+				"db.host" => "",
 				"db.port" => "",
 				"db.database" => "",
 				"db.username" => "",
@@ -92,6 +218,16 @@
 			);
 		}
 		
+		/**
+		 * Reads the EWT configuration file
+		 * 
+		 * Reads the EWT configuration file.  For any EWT configuration options that
+		 * are omitted, the default values are assumed.
+		 * 
+		 * @return array The EWT configuration
+		 * 
+		 * @throws Exception If the EWT configuration file doesn't exist or is not readable
+		 */
 		private static function readConfigFile()
 		{
 			$configFile = self::configFilePath();
@@ -115,31 +251,56 @@
 			
 			return $config;
 		}
-				
+		
+		/**
+		 * Constructor
+		 * 
+		 * Constructs a Config object based on the options specified
+		 * in the EWT configuratino file.  A checksum of the configuration
+		 * file is stored for caching purposes.
+		 */
 		private function __construct()
 		{
 			$this->config = self::readConfigFile();
 			$this->checksum = sha1_file(self::configFilePath());
 		}
 		
+		/**
+		 * Get the current EWT configuration
+		 * 
+		 * Gets the current EWT configuration, as specified in the EWT configufation file
+		 * 
+		 * @return array An associative array containing the current EWT configuration
+		 */
 		public function getConfig()
 		{
 			return $this->config;
 		}
 		
+		/**
+		 * Get a configuration setting
+		 * 
+		 * Gets the specified configuration setting
+		 * 
+		 * @param string $key The configuration setting to get
+		 * @return string A configuration setting, or null if the specified setting does not exist
+		 */
 		public function getSetting($key)
 		{
 			return isset($this->config[$key]) ? $this->config[$key] : null;
 		}
 		
+		/**
+		 * Get configuration file checksum
+		 * 
+		 * Gets the checksum of the EWT configuration file at the time the Config object was created.  This
+		 * is used when determining if a cached Config object is obsolete.
+		 * 
+		 * @return string Checksum of the EWT configuration file
+		 */
 		public function getChecksum()
 		{
 			return $this->checksum;
-		}
-		
-		public function __clone()
-		{
-			throw new Exception("This object does not support cloning");
 		}
 	}
 ?>
