@@ -25,17 +25,102 @@
 	namespace elwood\page;
 	
 	use elwood\page\element\Element;
+	use elwood\config\Config;
+	use elwood\log\Log;
+	use Exception;
 	
 	abstract class Page
 	{
 		protected $elements = array();
+		protected $request = array();
 		
-		abstract public function name(array $parameters);
-		abstract public function head(array $parameters);
-		abstract public function style(array $parameters);
-		abstract public function content(array $parameters);
-		abstract public function isRestricted(array $parameters);
+		abstract public function __construct(array &$request);
+		abstract public function name();
 				
+		public static function render(array $parameters = array())
+		{
+			set_error_handler(function($errno, $errstr, $errfile, $errline)
+			{
+				if ($errno === E_RECOVERABLE_ERROR)
+					throw new ErrorException($errstr, $errno, 0, $errfile, $errline);
+			});
+			
+			$template = Config::getInstance()->getSetting(Config::OPTION_WEBSITE_TEMPLATE);
+			$templatePath = implode(DIRECTORY_SEPARATOR, array(__DIR__, "..", "..", "templates", $template));
+			
+			if (!is_readable($templatePath))
+				throw new Exception("Website template does not exist: " . $template);
+			
+			$requestedPage = isset($parameters['page']) ? $parameters['page'] : "Default";
+			$pageClass = $requestedPage . "Page";
+			$page = self::loadPage($pageClass, $parameters);
+			
+			ob_start();
+			include $templatePath;
+			return ob_get_clean();
+		}
+		
+		private static function loadPage($pageClass, array &$parameters)
+		{
+			$pageClass = "elwood\\page\\" . $pageClass;
+			
+			try
+			{
+				$page = new $pageClass($parameters);
+			}
+			catch (Exception $ex)
+			{
+				Log::writeAlert("Could not load page class (" . $pageClass . "): " . $ex->getMessage() . "...loading the default page instead");
+				$page = new DefaultPage($parameters);
+			}
+			
+			if (!($page instanceof Page))
+			{
+				Log::writeAlert("Could not load page class (" . $pageClass . "): The object is not a Page type...loading the default page instead");
+				$page = new DefaultPage($parameters);
+			}
+			
+			if (!$result = $page->isRestricted())
+				return $page;
+			
+			return self::loadPage($result, $parameters);
+		}
+		
+		public function head()
+		{
+		}
+		
+		public function style()
+		{
+		}
+		
+		public function content()
+		{
+		}
+		
+		public function isAccessible()
+		{
+			return false;
+		}
+		
+		public function isRestricted()
+		{
+			return false;
+		}
+		
+		public function javascript()
+		{
+			if (empty($this->elements))
+				return "";
+		
+			$out = array();
+		
+			foreach ($this->elements as $element)
+				$out[] = $element->javascript();
+		
+			return implode("\n", $out);
+		}
+						
 		public function addElement(Element $element)
 		{
 			$this->elements[$element->getName()] = $element;
@@ -54,17 +139,9 @@
 			return $this->elements;
 		}
 		
-		public function javascript(array $parameters)
+		public function getRequest()
 		{
-			if (empty($this->elements))
-				return "";
-				
-			$out = array();
-			
-			foreach ($this->elements as $element)
-				$out[] = $element->javascript();
-			
-			return implode("\n", $out);
+			return $this->request;
 		}
 	}
 ?>

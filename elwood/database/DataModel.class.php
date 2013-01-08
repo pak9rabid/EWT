@@ -139,9 +139,9 @@
 		 * tables
 		 * 
 		 * @param mixed $tables A list of tables to initialize the DataModel with.
-		 *              This can be an array containing a list of table names, or a
-		 *              variable list of arguments, with each argument being a table
-		 *              name.
+		 *    This can be an array containing a list of table names, or a
+		 *    variable list of arguments, with each argument being a table
+		 *    name.
 		 */
 		public function __construct($tables = "")
 		{
@@ -158,8 +158,7 @@
 		 * Returns a string representation of this DataModel object
 		 * 
 		 * @return string A string representation of this DataModel object,
-		 *                displaying all set attributes and associated
-		 *                comparators.
+		 *    displaying all set attributes and associated comparators.
 		 */
 		public function __toString()
 		{
@@ -256,9 +255,8 @@
 		 * attributes.
 		 * 
 		 * @param mixed $tables A list of tables to set.  This can be either an
-		 *                      array containing a list of table names, or a
-		 *                      variable list of arguments, with each argument
-		 *                      being a table name.
+		 *    array containing a list of table names, or a variable list of
+		 *    arguments, with each argument being a table name.
 		 *                      
 		 * @throws Exception If an invalid table name is specified
 		 * @return DataModel $this (for method chaining)
@@ -579,6 +577,7 @@
 		 *    arguments, wich each argument being an attribute string.  See
 		 *    setAttribute() for details on how the attribute string should be
 		 *    formatted.
+		 * @return DataModel $this (for method chaining)
 		 */
 		public function setAttributes($attributes)
 		{
@@ -603,6 +602,14 @@
 			return $this;
 		}
 		
+		/**
+		 * Remove a set attribute
+		 * 
+		 * Removes the specified attribute from the list of attributes
+		 * 
+		 * @param string $attributeName The attribute to remove
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function removeAttribute($attributeName)
 		{
 			$attribute = self::parseAttributeName($attributeName);
@@ -610,7 +617,17 @@
 			unset($this->attributes[$attribute->table][$attribute->name]);
 			return $this;
 		}
-		
+		/**
+		 * Clear attributes
+		 * 
+		 * Clears attributes.  If $table is specified, only attribute contained
+		 * within the specified table will be cleared, otherwsise all attributes
+		 * are cleared.
+		 * 
+		 * @param string $table Optional.  If specified, only attributes in
+		 *    the specified table will be cleared.
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function clearAttributes($table = "")
 		{
 			if (!empty($table))
@@ -632,6 +649,14 @@
 			return $this;
 		}
 
+		/**
+		 * Clear all settings
+		 * 
+		 * Clears all set attributes, table relationships, orders,
+		 * selects, and updates.
+		 * 
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function clear()
 		{
 			return $this
@@ -642,6 +667,18 @@
 						->clearUpdates();
 		}
 		
+		/**
+		 * Execute a SELECT query against a database
+		 * 
+		 * Executes a SELECT query based on set attributes and their associated
+		 * comparators against a relational database.
+		 * 
+		 * @param string $query Optional.  If specified, a copy of the
+		 *    generated SQL query will be placed here.  This is primarily used
+		 *    for testing and debugging purposes.
+		 * @return array The results of the SELECT query, as an array of
+		 *    DataModel objects
+		 */
 		public function executeSelect(&$query = null)
 		{
 			if (!empty($this->db))
@@ -653,6 +690,17 @@
 			}
 		}
 
+		/**
+		 * Execute an INSERT query against a database
+		 * 
+		 * Executes an INSERT query based on set attributes against a
+		 * relational database.
+		 * 
+		 * @param string $query Optional.  If specified, a copy of the
+		 *    generated SQL query will be placed here.  This is primarily used
+		 *    for testing and debugging purposes.
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function executeInsert(&$query = null)
 		{			
 			if (!empty($this->db))
@@ -666,6 +714,18 @@
 			return $this;
 		}
 		
+		/**
+		 * Execute an UPDATE query against a database
+		 * 
+		 * Executes an UPATE query based on any set attributes and updates
+		 * against a relational database.  Any set updates are used for the new
+		 * value and any set attributes are used for the WHERE clause.
+		 * 
+		 * @param string $query Optional.  If specified, a copy of the
+		 *    generated SQL query will be placed here.  This is primarily used
+		 *    for testing and debugging purposes.
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function executeUpdate(&$query = null)
 		{
 			if (!empty($this->db))
@@ -675,19 +735,46 @@
 				$db = Database::getInstance();
 				$db->executeUpdate($this, $query);
 			}
+			
+			// FIXED: return $this
+			return $this;
 		}
 
+		/**
+		 * Execute a DELETE query against a database
+		 * 
+		 * Executes a DELETE query based on any set attributes against a
+		 * relational database.
+		 * 
+		 * @param string $query Optional.  If specified, a copy of the
+		 *    generated SQL query will be placed here.  This is primarily used
+		 *    for testing and debugging purposes.
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function executeDelete(&$query = null)
 		{			
 			if (!empty($this->db))
-				return $this->db->executeDelete($this, $query);
+				$this->db->executeDelete($this, $query);
 			else
 			{
 				$db = Database::getInstance();
-				return $db->executeDelete($this, $query);
+				$db->executeDelete($this, $query);
 			}
+			
+			// FIXED: return $this
+			return $this;
 		}
 		
+		/**
+		 * Set a comparator
+		 * 
+		 * Sets a comparator for an existing attribute.
+		 * 
+		 * @param string $attributeName Attribute to set the comparator on.  If
+		 *    the specified attribute does not exist, no changes are made.
+		 * @param string $comparator The comparator to set.  For a list of
+		 *    valid comparators, see the DataModel::comparators constant.
+		 */
 		public function setComparator($attributeName, $comparator)
 		{
 			$attribute = self::parseAttributeName($attributeName);
@@ -701,6 +788,16 @@
 			return $this;
 		}
 		
+		/**
+		 * Get a set comparator
+		 * 
+		 * Get's the value of a set attribute's comparator.
+		 * 
+		 * @param string $attributeName The name of the attribute who's
+		 *    comparator to retrieve
+		 * @return string The specified attribute's comparator, or null if the
+		 *    specified attribute does not exist.
+		 */
 		public function getComparator($attributeName)
 		{
 			$attribute = self::parseAttributeName($attributeName);
@@ -708,6 +805,20 @@
 			return isset($this->attributes[$attribute->table][$attribute->name]) ? $this->attributes[$attribute->table][$attribute->name]->comparator : null;
 		}
 		
+		/**
+		 * Get a list of set comparators
+		 * 
+		 * Gets a list of any set comparators, optionally limited to a specific
+		 * table.
+		 * 
+		 * @param string $table Optional.  The table for which to get the set
+		 *    comparators.
+		 * @return array An array containing any set comparators.  If $table is
+		 *    specified, only comparators from the specified table are
+		 *    included, otherwise all comparators are returned.  The returned
+		 *    array is formatted as:
+		 *       $comparators[<table name>.<attribute name>] = <comparator>
+		 */
 		public function getComparators($table = "")
 		{
 			$f = function(stdClass $attribute)
@@ -747,6 +858,15 @@
 			return $allComparators;
 		}
 		
+		/**
+		 * Reset attribute comparators
+		 * 
+		 * Resets comparators to the default value (=).
+		 * 
+		 * @param string $table Optional.  If specified, resetting will be
+		 *    limited to the specified table.
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function resetComparators($table = "")
 		{
 			$f = function(array $attributes, $table = "")
@@ -772,6 +892,17 @@
 			return $this;
 		}
 		
+		/**
+		 * Set a table relationship
+		 * 
+		 * Sets a relationship for the purpose of performing an SQL INNER JOIN
+		 * between two tables.
+		 * 
+		 * @param string $relationship The table relationship, in the form:
+		 *    <table name>.<attribute name> = <table name>.<attribute name>
+		 * @throws Exception If the specifeid relationship is invalid
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function setTableRelationship($relationship)
 		{
 			list($left, $right) = explode("=", $relationship, 2);
@@ -811,6 +942,20 @@
 			return $this;
 		}
 		
+		/**
+		 * Set one or more table relationships
+		 * 
+		 * Sets one or more table relationships for the purpose of performing
+		 * an SQL INNER JOIN between two or more tables.
+		 * 
+		 * @param mixed $relationships A list of relationships to set.  This
+		 *    be in the form of an array, or a variable list of relationship
+		 *    parameters.  See the setTableRelationships($relationship) method
+		 *    for how a relationsihp should be specified.
+		 *    
+		 * @throws Exception
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function setTableRelationships($relationships)
 		{
 			if (!is_array($relationships))
@@ -833,17 +978,44 @@
 			return $this;
 		}
 		
+		/**
+		 * Get table relationships
+		 * 
+		 * Gets all set table relationships.  Table relationships are used for
+		 * the purpose of conducting SQL INNER JOIN SELECT queries.
+		 * 
+		 * @return array A list of all table relationships
+		 */
 		public function getTableRelationships()
 		{
 			return $this->tableRelationships;
 		}
 		
+		/**
+		 * Clear table relationships
+		 * 
+		 * Clears all set table relationships.
+		 * 
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function clearTableRelationships()
 		{
 			$this->tableRelationships = array();
 			return $this;
 		}
 		
+		/**
+		 * Add a select attribute
+		 * 
+		 * Adds a select attribute.  Select attribute are used as part of the
+		 * select criteria when executing a SELECT query.  If  no select
+		 * attributes are specified, then '*' is assumed when executeSelect()
+		 * is called.
+		 * 
+		 * @param string $attributeName The name of the attribute to select
+		 * @throws Exception If the specified $attributeName is invalid
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function addSelect($attributeName)
 		{
 			$attribute = self::parseAttributeName($attributeName);
@@ -863,6 +1035,15 @@
 			return $this;
 		}
 		
+		/**
+		 * Add one or more select attributes
+		 * 
+		 * Adds one or more select attributes
+		 * 
+		 * @param mixed $attributes This can be either an array containing
+		 *    multiple selects to add, or a variable list of select parameters
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function addSelects($attributes)
 		{
 			if (!is_array($attributes))
@@ -884,6 +1065,17 @@
 			return $this;
 		}
 		
+		/**
+		 * Set ont or more select attributes
+		 * 
+		 * Sets one or more select attributes, clearing any previously-set
+		 * select attributes.
+		 * 
+		 * @param mixed $attributes This can be either an array containing
+		 *    multiple selects to set, or a variable list of select parameters
+		 * @throws Exception If any of the specified selects are invalid
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function setSelects($attributes)
 		{
 			if (!is_array($attributes))
@@ -905,17 +1097,43 @@
 			return $this;
 		}
 		
+		/**
+		 * Get select attributes
+		 * 
+		 * Gets all set select attributes.
+		 * 
+		 * @return array An array containing all set select attributes
+		 */
 		public function getSelects()
 		{
 			return $this->selects;
 		}
 		
+		/**
+		 * Clear select attributes
+		 * 
+		 * Clears all set select attributes.
+		 * 
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function clearSelects()
 		{
 			$this->selects = array();
 			return $this;
 		}
 		
+		/**
+		 * Set an udpate attribute
+		 * 
+		 * Sets an update attribute.  Update attributes are used to define
+		 * which columns are to be updated with what when the executeUpdate()
+		 * method is called.
+		 * 
+		 * @param string $attributeName The name of the attribute to update
+		 * @param unknown_type $value The new value to set the updated attribute to
+		 * @throws Exception If the specified attribute name is invalid
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function setUpdate($attributeName, $value)
 		{
 			$attribute = self::parseAttributeName($attributeName);
@@ -928,6 +1146,16 @@
 			return $this;
 		}
 		
+		/**
+		 * Set one or more update attributes
+		 * 
+		 * Sets one or more update attributes.
+		 * 
+		 * @param mixed $updates This can be either an array containing a list
+		 *    of updates, or a variable list of update parameters.
+		 * @throws Exception If one of the specified attribute names is invalid
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function setUpdates($updates)
 		{
 			if (!is_array($updates))
@@ -952,24 +1180,56 @@
 			return $this;
 		}
 		
+		/**
+		 * Remove a set update attribute
+		 *
+		 * Removes a set update attribute.
+		 * 
+		 * @param string $attribute The name of the set update attribute to
+		 *    remove
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function removeUpdate($attribute)
 		{
 			unset($this->updates[$attribute]);
 			return $this;
 		}
 		
+		/**
+		 * Get the value of a set update attribute
+		 * 
+		 * Gets the value of a set update attribute.
+		 * 
+		 * @param string $attribute The name of the udpate attribute to retreive
+		 *    the value of.
+		 * @return string The value of the named update attribute, or null if
+		 *    the specified update attribute does not exist
+		 */
 		public function getUpdate($attribute)
 		{
 			return isset($this->updates[$attribute]) ? $this->updates[$attribute] : null;
 		}
 		
+		/**
+		 * Get set update attributes
+		 * 
+		 * Gets a list of all set update attributes, optionally limited to a
+		 * specific table.
+		 * 
+		 * @param string $table Optional.  If specified, the returned updates
+		 *    will be limitd to the specified table
+		 * @param boolean $useShortKeys Optional.  If specified, the returned
+		 *    array will only contain short keys.  That is, only the attribute
+		 *    name will be used as keys, omitting the table name.
+		 *    <br><br>
+		 *    <b>WARNING:</b> If this is set to true and there are multiple
+		 *    tables that contain the same attribute name, the last entry will
+		 *    override the previous entry in the returned array.
+		 * @return array An array containing the set update attributes,
+		 *    formatted as:  $updates[<attribute name>] = <update value>
+		 */
 		public function getUpdates($table = "", $useShortKeys = false)
 		{
-			/**
-			 * WARNING:	if $useShortKeys is set to true and there are multiple tables that
-			 *  		contain the same attribute name, the last entry will override the
-			 *  		previous entry in the returned array
-			 */
 			if (empty($table) && !$useShortKeys)
 				return $this->updates;
 		
@@ -995,13 +1255,42 @@
 			return $returnArray;
 		}
 		
+		/**
+		 * Clear all set update attributes
+		 * 
+		 * Clears out all set update attributes.
+		 * 
+		 * @return DataModel $this (for method chaining)
+		 */
 		public function clearUpdates()
 		{
 			$this->updates = array();
 			return $this;
 		}
 		
-		private final function getExistingTable($table, $ignoreMissing = false)
+		/**
+		 * Get an existing table and/or validate a table name
+		 * 
+		 * This is a convenience method that is used throughout the DataModel
+		 * class for simplifying table name validation, as well as making it
+		 * easier to work with single-table DataModel objects.  In the case of
+		 * the latter, when this method is called with with no arguments it
+		 * returns the name of the single set table.  This makes it possible to
+		 * reference attributes without having to explicitly provide its
+		 * table name as well, in the case of single-table DataModel objects.
+		 * 
+		 * @param string $table Optional.  The name of the table to retrieve
+		 * @param boolean $ignoreMissing Optional.  If true, will not require
+		 *    the specified table to exist and will simply check that the table
+		 *    name is a valid identifier.
+		 * @throws Exception If there are multiple set tables and no table name
+		 *    is specified
+		 * @throws Exception If an invalid table name is specified
+		 * @throws Exception If $ignoreMissing is false and the specified table
+		 *    does not exist
+		 * @return A table name
+		 */
+		private final function getExistingTable($table = "", $ignoreMissing = false) //FIXED: added default value ("") for $table
 		{
 			$tables = $this->getTables();
 		

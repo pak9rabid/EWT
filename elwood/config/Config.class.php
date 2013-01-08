@@ -121,6 +121,15 @@
 		const OPTION_DB_DEBUG = "db.debug";
 		
 		/**
+		 * OPTION_WEBSITE_TEMPLATE
+		 * 
+		 * Convenience constant for the configuration option 'website.template'
+		 * 
+		 * @var string
+		 */
+		const OPTION_WEBSITE_TEMPLATE = "website.template";
+		
+		/**
 		 * OPTION_LOG_ENABLED
 		 *
 		 * Convenience constant for the configuration option 'log.enabled'
@@ -203,18 +212,21 @@
 			return array
 			(
 				/** database options */
-				"db.type" => "",
-				"db.host" => "",
-				"db.port" => "",
-				"db.database" => "",
-				"db.username" => "",
-				"db.password" => "",
-				"db.debug" => "false",
+				self::OPTION_DB_TYPE => "",
+				self::OPTION_DB_HOST => "",
+				self::OPTION_DB_PORT => "",
+				self::OPTION_DB_DATABASE => "",
+				self::OPTION_DB_USERNAME => "",
+				self::OPTION_DB_PASSWORD => "",
+				self::OPTION_DB_DEBUG => "false",
+				
+				/** website options */
+				self::OPTION_WEBSITE_TEMPLATE => "default.php",
 				
 				/** logging options */
-				"log.enabled" => "true",
-				"log.type" => "rotating",
-				"log.path" => "logs"
+				self::OPTION_LOG_ENABLED => "true",
+				self::OPTION_LOG_TYPE => "rotating",
+				self::OPTION_LOG_PATH => "logs"
 			);
 		}
 		
