@@ -7,6 +7,7 @@
 	
 	use Closure;
 	use Exception;
+	use elwood\database\SQLException;
 	
 	class Test
 	{
@@ -27,9 +28,13 @@
 				{
 					$errors[] = "Test failed: " . $ex->getTestName() . ": " . $ex->getMessage();
 				}
+				catch (SQLException $ex)
+				{
+					$errors[] = "Exception running query: " . $ex->getQuery() . ": " . $ex->getErrorMessage();
+				}
 				catch (Exception $ex)
 				{
-					$errors[] = "Exception at " . $ex->getFile() . ", line " . $ex->getLine() . ": " . $ex->getMessage();
+					$errors[] = "Exception encountered: " . $ex->getMessage();
 				}
 			}
 			
