@@ -56,6 +56,8 @@
 		protected $tableRelationships = array();
 		protected $selects = array();
 		protected $updates = array();
+		protected $limit = 0;
+		protected $offset = 0;
 		protected $db = null;
 		
 		/**
@@ -1266,6 +1268,61 @@
 		{
 			$this->updates = array();
 			return $this;
+		}
+		
+		/**
+		 * Limit the number of rows returned from an SQL SELECT query
+		 * 
+		 * Sets the number of rows to be returned when a SELECT query is
+		 * executed.
+		 * 
+		 * @param int $limit
+		 * @return DataModel $this (for method chaining)
+		 */
+		public function setLimit($limit = 0)
+		{
+			$this->limit = $limit;
+			return $this;
+		}
+		
+		/**
+		 * Get the set limit
+		 * 
+		 * Gets the number of rows to be returned when a SELECT query is
+		 * executed.
+		 * 
+		 * @return int The set limit
+		 */
+		public function getLimit()
+		{
+			return $this->limit;
+		}
+		
+		/**
+		 * Set the offset
+		 * 
+		 * Sets the offset for SELECT queries.  This is typically used with
+		 * LIMIT to page-over sets of results.
+		 * 
+		 * @param int $offset
+		 * @return DataModel $this (for method chaining)
+		 */
+		public function setOffset($offset = 0)
+		{
+			$this->offset = $offset;
+			return $this;
+		}
+		
+		/**
+		 * Get the offset
+		 * 
+		 * Gets the set offset.
+		 * 
+		 * @return int The offset
+		 */
+		public function getOffset()
+		{
+			return $this->offset;
 		}
 		
 		/**

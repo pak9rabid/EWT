@@ -24,6 +24,7 @@
 
 	namespace elwood\database;
 	use PDO;
+	use Exception;
 	use elwood\config\Config;
 	
 	class SqliteDatabase extends Database
@@ -34,6 +35,18 @@
 			$this->dsn = "sqlite:" . $config->getSetting(Config::OPTION_DB_DATABASE);
 			$this->pdo = new PDO($this->dsn);
 			$this->pdo->exec("PRAGMA foreign_keys = ON");
+		}
+		
+		// Override
+		public function executeSelect(DataModel $dm, &$query = null)
+		{
+			$offset = $dm->getOffset();
+			$limit = $dm->getLimit();
+			
+			if (empty($limit) && !empty($offset))
+				throw new Exception("SQLite does not allow queries that contain OFFSET without LIMIT");
+			
+			return parent::executeSelect($dm, $query);
 		}
 	}
 ?>

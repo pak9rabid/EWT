@@ -69,5 +69,17 @@
 				throw new SQLException("Error executing SQL query", $prep->getQueryDebug(), $errorCode, $errorMessage);
 			}
 		}
+		
+		// Override
+		public function executeSelect(DataModel $dm, &$query = null)
+		{
+			$offset = $dm->getOffset();
+			$limit = $dm->getLimit();
+		
+			if (empty($limit) && !empty($offset))
+				throw new Exception("MySQL does not allow queries that contain OFFSET without LIMIT");
+		
+			return parent::executeSelect($dm, $query);
+		}
 	}
 ?>

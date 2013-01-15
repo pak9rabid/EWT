@@ -273,12 +273,12 @@
 			}
 			catch (Exception $ex)
 			{
-				Log::writeError($ex);
 				$errorInfo = $this->pdo->errorInfo();
 				$errorCode = $errorInfo[0];
 				$errorMessage = $errorInfo[2];
-				
-				throw new SQLException("Error executing SQL Query", $prep->getQueryDebug(), $errorCode, $errorMessage);
+				$sqlEx = new SQLException("Error executing SQL Query", $prep->getQueryDebug(), $errorCode, $errorMessage);
+				Log::writeError($sqlEx->getMessage() . ": " . $sqlEx->getQuery() . ": " . $sqlEx->getErrorMessage());
+				throw $sqlEx;
 			}
 		}
 		
@@ -316,6 +316,12 @@
 					return $attribute . " " . $direction;
 				}, array_keys($order), $order)));
 			}
+			
+			if ($dm->getLimit() != 0)
+				$prep->addSql(" LIMIT " . $dm->getLimit());
+			
+			if ($dm->getOffset() != 0)
+				$prep->addSql(" OFFSET " . $dm->getOffset());
 			
 			if (isset($query))
 				$query = $prep->getQueryDebug();
