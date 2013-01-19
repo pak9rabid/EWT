@@ -24,6 +24,8 @@
 
 	namespace elwood\ajax;
 	
+	use stdClass;
+	
 	/**
 	 * Ajax response
 	 * 
@@ -51,7 +53,9 @@
 		}
 	
 		/**
-		 * Determines if the ajax response contains errors
+		 * Check for errors
+		 * 
+		 * Checks if the ajax response contains any errors.
 		 * 
 		 * @return boolean true if the response contains errors, false otherwise
 		 */
@@ -61,37 +65,27 @@
 		}
 	
 		/**
-		 * Get ajax response text
+		 * Get ajax response data
 		 * 
-		 * @return string Returns the response text associated with the ajax response
+		 * Gets the data associated with this ajax response.
+		 * 
+		 * @return mixed The response data associated with the ajax response
 		 */
-		public function getResponseText()
+		public function getData()
 		{
 			return $this->data;
 		}
-	
+		
 		/**
-		 * Set response errors
+		 * Get ajax response errors
 		 * 
-		 * Set a list of response errors associated with the ajax response
+		 * Gets any errors associated with this ajax response.
 		 * 
-		 * @param array $errors A list of errors
+		 * @return array The errors associated with this ajax response
 		 */
-		public function setErrors(array $errors)
+		public function getErrors()
 		{
-			$this->errors = $errors;
-		}
-	
-		/**
-		 * Set response data
-		 * 
-		 * Set the response string associated with the ajax response
-		 * 
-		 * @param string $data
-		 */
-		public function setData($data)
-		{
-			$this->data = $data;
+			return $this->errors;
 		}
 	
 		/**
@@ -103,6 +97,8 @@
 		 */
 		public function toJson()
 		{
+			$json = new stdClass();
+			
 			foreach ($this as $key => $value)
 				@$json->$key = $value;
 	

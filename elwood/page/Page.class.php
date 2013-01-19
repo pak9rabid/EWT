@@ -28,13 +28,14 @@
 	use elwood\config\Config;
 	use elwood\log\Log;
 	use Exception;
+	use ErrorException;
 	
 	abstract class Page
 	{
 		protected $elements = array();
-		protected $request = array();
+		protected $parameters = array();
 		
-		abstract public function __construct(array &$request);
+		abstract public function __construct(array &$parameters);
 		abstract public function name();
 				
 		public static function render(array $parameters = array())
@@ -139,9 +140,9 @@
 			return $this->elements;
 		}
 		
-		public function getRequest()
+		public function getParameters()
 		{
-			return $this->request;
+			return $this->parameters;
 		}
 	}
 ?>

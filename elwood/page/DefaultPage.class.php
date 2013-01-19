@@ -3,9 +3,9 @@
 	
 	class DefaultPage extends Page
 	{
-		public function __construct(array &$request)
+		public function __construct(array &$parameters)
 		{
-			$this->request =& $request;
+			$this->parameters =& $parameters;
 		}
 		
 		public function name()
