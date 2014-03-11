@@ -1,6 +1,6 @@
 <?php
 /**
- Copyright (c) 2012 Patrick Griffin
+ Copyright (c) 2014 Patrick Griffin
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the
@@ -49,7 +49,7 @@
 		{
 			$config = Config::getInstance();
 			
-			if ($config->getSetting(Config::OPTION_LOG_ENABLED) !== "true")
+			if (!$config->getSetting(Config::OPTION_LOG_ENABLED))
 				return false;
 			
 			switch ($config->getSetting(Config::OPTION_LOG_TYPE))

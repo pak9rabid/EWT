@@ -1,6 +1,6 @@
 <?php
 /**
- Copyright (c) 2012 Patrick Griffin
+ Copyright (c) 2014 Patrick Griffin
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the
@@ -24,6 +24,8 @@
 
 	namespace elwood\page\element;
 	
+	use Exception;
+	
 	abstract class InputElement extends Element
 	{
 		protected $label;
@@ -37,7 +39,16 @@
 		
 		public function setValue($value)
 		{
+			if (!$this->isValid($value))
+				throw new Exception("Invalid value specified: $value");
+			
 			$this->value = $value;
+			return $this;
+		}
+		
+		public function clearValue()
+		{
+			unset($this->value);
 			return $this;
 		}
 		
@@ -48,7 +59,12 @@
 		
 		public function getValue()
 		{
-			return $this->value;
+			return isset($this->value) ? $this->value : null;
+		}
+		
+		public function isValid($input)
+		{
+			return true;
 		}
 		
 		// Override

@@ -1,6 +1,6 @@
 <?php
 /**
- Copyright (c) 2012 Patrick Griffin
+ Copyright (c) 2014 Patrick Griffin
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the
@@ -156,7 +156,7 @@
 			if (strlen($identifier) > self::MAX_IDENTIFIER_LENGTH)
 				return false;
 		
-			if (!preg_match("/^[A-Za-z]{1}[A-Za-z0-9|_]*$/", $identifier))
+			if (!preg_match("/^[A-Z|_]{1}[A-Z0-9|_]*$/i", $identifier))
 				return false;
 		
 			return true;
@@ -191,7 +191,7 @@
 				}
 				else
 				{
-					$likeConditions[] = "$attribute LIKE ?";
+					$likeConditions[] = !$dm->isCaseSensitive() ? "UPPER($attribute) LIKE UPPER(?)" : "$attribute LIKE ?";
 			
 					switch ($comparator)
 					{
@@ -238,29 +238,46 @@
 		 */
 		public function executeQuery(DbQueryPreper $prep, $getNumRowsAffected = false)
 		{
-			if ($this->config->getSetting(Config::OPTION_DB_DEBUG) === "true")
+			if ($this->config->getSetting(Config::OPTION_DB_DEBUG))
 				Log::writeInfo("Query: " . $prep->getQueryDebug());
 				
 			$results = array();
 			
 			try
-			{				
+			{
 				$stmt = $this->pdo->prepare($prep->getQuery());
-				$stmt->execute($prep->getBindVars());
+				
+				foreach ($prep->getBindVars() as $key => $bindParam)
+					$stmt->bindParam($key + 1, $bindParam->value, $bindParam->type);
+				
+				$stmt->execute();
 				
 				if ($getNumRowsAffected)
 					return $stmt->rowCount();
 				
-				return array_map(function($row)
+				return array_map(function($row) use ($prep)
 				{
 					$normalizedRow = array();
 					
-					array_walk($row, function($value, $attribute) use (&$normalizedRow)
+					array_walk($row, function($value, $attribute) use (&$normalizedRow, $prep)
 					{
 						$parts = explode(".", $attribute);
 						
 						if (count($parts) < 2)
-							$attribute = "unknown_table." . $attribute;
+						{
+							// no table name...see if we can figure out the
+							// table name from the query							
+							$matches = array();
+							
+							if
+							(
+								preg_match("/^SELECT\b.*\bFROM\b(.*)\bWHERE\b/i", $prep->getQuery(), $matches) &&
+								count($results = (preg_split("/[^A-Z0-9_]/i", trim($matches[1])))) == 1
+							)
+								$attribute = $results[0] . "." . $attribute;
+							else
+								$attribute = "unknown_table." . $attribute;
+						}
 						
 						$normalizedRow[] = $attribute . " = " . $value;
 					});
@@ -269,7 +286,7 @@
 					$dm->setAttributes($normalizedRow);
 					return $dm;
 					
-				}, $stmt->fetchAll(PDO::FETCH_ASSOC));				
+				}, $stmt->fetchAll(PDO::FETCH_ASSOC));
 			}
 			catch (Exception $ex)
 			{
@@ -318,10 +335,10 @@
 			}
 			
 			if ($dm->getLimit() != 0)
-				$prep->addSql(" LIMIT " . $dm->getLimit());
+				$prep->addSql(" LIMIT ")->addVariable($dm->getLimit());
 			
 			if ($dm->getOffset() != 0)
-				$prep->addSql(" OFFSET " . $dm->getOffset());
+				$prep->addSql(" OFFSET ")->addVariable($dm->getOffset());
 			
 			if (isset($query))
 				$query = $prep->getQueryDebug();

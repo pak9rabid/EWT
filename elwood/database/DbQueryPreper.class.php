@@ -1,6 +1,6 @@
 <?php
 /**
- Copyright (c) 2012 Patrick Griffin
+ Copyright (c) 2014 Patrick Griffin
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the
@@ -25,10 +25,11 @@
 	namespace elwood\database;
 	
 	use Exception;
+	use PDO;
 	
 	class DbQueryPreper
 	{
-		// Attribute
+		// Attributes
 		protected $query;
 		protected $bindVars = array();
 		
@@ -45,10 +46,27 @@
 			return $this;
 		}
 		
-		public function addVariable($bindVar)
+		public function addPrep(DbQueryPreper $prep)
+		{
+			$this->query .= $prep->getQuery();
+			$this->bindVars = array_merge($this->bindVars, $prep->getBindVars());
+		}
+		
+		public function addVariable($bindVar, $type = null)
 		{
 			$this->query .= "?";
-			$this->bindVars[] = $bindVar;
+			$this->bindVars[] = (object) array
+			(
+				"value" => $bindVar === null ? "NULL" : $bindVar,
+				"type" => !empty($type)
+							? $type
+							: ($bindVar == null
+								? PDO::PARAM_NULL
+								: (is_int($bindVar) || is_float($bindVar)
+									? PDO::PARAM_INT
+									: PDO::PARAM_STR))
+							
+			);
 			
 			return $this;
 		}
@@ -57,13 +75,23 @@
 		{
 			$this->query .= implode($delimiter, array_pad(array(), count($bindVars), "?"));
 			$this->addVariablesNoPlaceholder($bindVars);
-			
 			return $this;
 		}
 		
 		public function addVariablesNoPlaceholder(array $bindVars)
 		{
-			$this->bindVars = array_merge($this->bindVars, $bindVars);
+			foreach ($bindVars as $bindVar)
+			{
+				$this->bindVars[] = (object) array
+				(
+					"value" => $bindVar == null ? "NULL" : $bindVar,
+					"type" => $bindVar == null
+								? PDO::PARAM_NULL
+								: (is_int($bindVar) || is_float($bindVar)
+									? PDO::PARAM_INT
+									: PDO::PARAM_STR)
+				);
+			}
 			
 			return $this;
 		}
@@ -78,9 +106,7 @@
 			$debugQuery = $this->query;
 			
 			foreach ($this->bindVars as $bindVar)
-			{
-				$debugQuery = preg_replace("/\?/", "'$bindVar'", $debugQuery, 1);
-			}
+				$debugQuery = preg_replace("/\?/", ($bindVar->type == PDO::PARAM_STR ? "'" . $bindVar->value . "'" : $bindVar->value), $debugQuery, 1);
 			
 			return $debugQuery;
 		}

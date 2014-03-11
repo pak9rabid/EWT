@@ -1,6 +1,6 @@
 <?php
 /**
- Copyright (c) 2012 Patrick Griffin
+ Copyright (c) 2014 Patrick Griffin
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the
@@ -55,10 +55,12 @@
 		protected $order = array();
 		protected $tableRelationships = array();
 		protected $selects = array();
+		protected $insertReturns = array();
 		protected $updates = array();
 		protected $limit = 0;
 		protected $offset = 0;
 		protected $db = null;
+		protected $isCaseSensitive = true;
 		
 		/**
 		 * Validates a comparator
@@ -650,6 +652,46 @@
 			
 			return $this;
 		}
+		
+		/**
+		 * Clear attributes except one(s) specified
+		 * 
+		 * Clears all attributes except the one(s) specified.
+		 * 
+		 * @param mixed $attributes A list of attributes to save.  This can be
+		 *	an array containing a list of attributes, or a variable list of
+		 *	arguments, with each argument being an attribute string.  See
+		 *	setAttributes() for details on how the attribute string should be
+		 *	formatted.
+		 * @throws Exception If invalid attribute is specified
+		 * @return DataModel $this (for method chaining)
+		 */
+		public function clearAttributesExcept($attributes)
+		{
+			if (!is_array($attributes))
+				$attributes = func_get_args();
+			
+			$backup = clone $this;
+			
+			try
+			{
+				$this->clearAttributes()->clearTableRelationships();
+				
+				foreach ($attributes as $attribute)
+				{
+					if ($backup->getAttribute($attribute) != null)
+						$this->setAttribute(implode(" ", array($attribute, $backup->getComparator($attribute), $backup->getAttribute($attribute))));
+				}
+			}
+			catch (Exception $ex)
+			{
+				$this->attributes = $backup->attributes;
+				$this->tableRelationships = $backup->tableRelationships;
+				throw $ex;
+			}
+			
+			return $this;
+		}
 
 		/**
 		 * Clear all settings
@@ -704,16 +746,14 @@
 		 * @return DataModel $this (for method chaining)
 		 */
 		public function executeInsert(&$query = null)
-		{			
+		{
 			if (!empty($this->db))
-				$this->db->executeInsert($this, $query);
+				return $this->db->executeInsert($this, $query);
 			else
 			{
 				$db = Database::getInstance();
-				$db->executeInsert($this, $query);
+				return $db->executeInsert($this, $query);
 			}
-			
-			return $this;
 		}
 		
 		/**
@@ -1125,6 +1165,126 @@
 		}
 		
 		/**
+		 * Add an insert return attribute
+		 *
+		 * Adds a insert return attribute.  For database systems that support it, this will
+		 * set the columns to be returned after an INSERT operation has been performed.
+		 *
+		 * @param string $attributeName The name of the attribute to select
+		 * @throws Exception If the specified $attributeName is invalid
+		 * @return DataModel $this (for method chaining)
+		 */
+		
+		public function addInsertReturn($attributeName)
+		{
+			$attribute = self::parseAttributeName($attributeName);
+			$attribute->table = $this->getExistingTable($attribute->table, true);
+		
+			if (!in_array($attribute->table, $this->getTables()))
+				$this->setTable($attribute->table);
+		
+			if (!Database::isValidIdentifier($attribute->name))
+				throw new Exception("Invalid attribute specified: " . $attribute->name);
+		
+			$attributeName = $attribute->table . "." . $attribute->name;
+		
+			if (!in_array($attributeName, $this->insertReturns))
+				$this->insertReturns[] = $attributeName;
+		
+			return $this;
+		}
+		
+		/**
+		 * Add one or more insert return attributes
+		 *
+		 * Adds one or more insert return attributes
+		 *
+		 * @param mixed $attributes This can be either an array containing
+		 *    multiple insert returns to add, or a variable list of insert return parameters
+		 * @return DataModel $this (for method chaining)
+		 */
+		public function addInsertReturns($attributes)
+		{
+			if (!is_array($attributes))
+				$attributes = func_get_args();
+		
+			$backup = $this->insertReturns;
+		
+			try
+			{
+				$f = array($this, "addInsertReturn");
+				array_walk($attributes, $f);
+			}
+			catch (Exception $ex)
+			{
+				$this->insertReturns = $backup;
+				throw $ex;
+			}
+		
+			return $this;
+		}
+		
+		/**
+		 * Set ont or more insert return attributes
+		 *
+		 * Sets one or more insert return attributes, clearing any previously-set
+		 * insert return attributes.
+		 *
+		 * @param mixed $attributes This can be either an array containing
+		 *    multiple insert return to set, or a variable list of insert return parameters
+		 * @throws Exception If any of the specified insert return are invalid
+		 * @return DataModel $this (for method chaining)
+		 */
+		public function setInsertReturns($attributes)
+		{
+			if (!is_array($attributes))
+				$attributes = func_get_args();
+		
+			$backup = $this->insertReturns;
+			$this->clearInsertReturns();
+		
+			try
+			{
+				$this->addInsertReturns($attributes);
+			}
+			catch (Exception $ex)
+			{
+				$this->insertReturns = $backup;
+				throw $ex;
+			}
+		
+			return $this;
+		}
+		
+		/**
+		 * Get insert return attributes
+		 *
+		 * Gets all set insert return attributes.
+		 *
+		 * @return array An array containing all set insert return attributes
+		 */
+		public function getInsertReturns()
+		{
+			return $this->insertReturns;
+		}
+		
+		/**
+		 * Clear insert return attributes
+		 *
+		 * Clears all set insert return attributes.
+		 *
+		 * @return DataModel $this (for method chaining)
+		 */
+		public function clearInsertReturns()
+		{
+			$this->insertReturns = array();
+			return $this;
+		}
+		
+		
+		
+		
+		/**
 		 * Set an udpate attribute
 		 * 
 		 * Sets an update attribute.  Update attributes are used to define
@@ -1281,7 +1441,9 @@
 		 */
 		public function setLimit($limit = 0)
 		{
-			$this->limit = $limit;
+			if (preg_match("/^[0-9]+$/", $limit))
+				$this->limit = $limit;
+			
 			return $this;
 		}
 		
@@ -1309,7 +1471,9 @@
 		 */
 		public function setOffset($offset = 0)
 		{
-			$this->offset = $offset;
+			if (preg_match("/^[0-9]+$/", $offset))
+				$this->offset = $offset;
+			
 			return $this;
 		}
 		
@@ -1323,6 +1487,35 @@
 		public function getOffset()
 		{
 			return $this->offset;
+		}
+		
+		/**
+		 * Set case-sensitivity
+		 * 
+		 * Sets whether the generated SQL query is case-sensitive or not.
+		 * This only applies to attributes that are used in combination with
+		 * any of the LIKE comparators (*?*, *?, and ?*)
+		 * 
+		 * @param boolean $isCaseSensitive True if query is to be case-sensitive,
+		 * 		false otherwise
+		 * @return DataModel $this (for method chaining)
+		 */
+		public function setCaseSensitive($isCaseSensitive = false)
+		{
+			$this->isCaseSensitive = (boolean)$isCaseSensitive;
+			return $this;
+		}
+		
+		/**
+		 * Check if case-sensitive
+		 * 
+		 * Checks if it's set to be case-sensitive or not.
+		 * 
+		 * @return boolean True if case-sensitive, false otherwise
+		 */
+		public function isCaseSensitive()
+		{
+			return $this->isCaseSensitive;
 		}
 		
 		/**

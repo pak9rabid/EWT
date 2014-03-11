@@ -4,6 +4,7 @@
 
 <!-- head -->
 <head>
+<meta charset="UTF-8">
 <title><?=$page->name()?></title>
 
 <!-- css -->

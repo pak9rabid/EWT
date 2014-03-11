@@ -1,6 +1,6 @@
 <?php
 /**
- Copyright (c) 2012 Patrick Griffin
+ Copyright (c) 2014 Patrick Griffin
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the
@@ -27,6 +27,7 @@
 	use elwood\page\element\Element;
 	use elwood\config\Config;
 	use elwood\log\Log;
+	use elwood\usr\page\DefaultPage;
 	use Exception;
 	use ErrorException;
 	
@@ -36,6 +37,7 @@
 		protected $parameters = array();
 		
 		abstract public function __construct(array &$parameters);
+		abstract public function id();
 		abstract public function name();
 				
 		public static function render(array $parameters = array())
@@ -46,13 +48,14 @@
 					throw new ErrorException($errstr, $errno, 0, $errfile, $errline);
 			});
 			
-			$template = Config::getInstance()->getSetting(Config::OPTION_WEBSITE_TEMPLATE);
+			$config = Config::getInstance();
+			$template = $config->getSetting(Config::OPTION_WEBSITE_TEMPLATE);
 			$templatePath = implode(DIRECTORY_SEPARATOR, array(__DIR__, "..", "..", "templates", $template));
 			
 			if (!is_readable($templatePath))
 				throw new Exception("Website template does not exist: " . $template);
 			
-			$requestedPage = isset($parameters['page']) ? $parameters['page'] : "Default";
+			$requestedPage = isset($parameters['page']) ? $parameters['page'] : $config->getSetting(Config::OPTION_WEBSITE_DEFAULT_PAGE);
 			$pageClass = $requestedPage . "Page";
 			$page = self::loadPage($pageClass, $parameters);
 			
@@ -63,7 +66,7 @@
 		
 		private static function loadPage($pageClass, array &$parameters)
 		{
-			$pageClass = "elwood\\page\\" . $pageClass;
+			$pageClass = "elwood\\usr\\page\\" . $pageClass;
 			
 			try
 			{
@@ -72,19 +75,25 @@
 			catch (Exception $ex)
 			{
 				Log::writeAlert("Could not load page class (" . $pageClass . "): " . $ex->getMessage() . "...loading the default page instead");
-				$page = new DefaultPage($parameters);
+				$page = self::loadDefaultPage($parameters);
 			}
 			
 			if (!($page instanceof Page))
 			{
 				Log::writeAlert("Could not load page class (" . $pageClass . "): The object is not a Page type...loading the default page instead");
-				$page = new DefaultPage($parameters);
+				$page = self::loadDefaultPage($parameters);
 			}
 			
 			if (!$result = $page->isRestricted())
 				return $page;
 			
 			return self::loadPage($result, $parameters);
+		}
+		
+		private static function loadDefaultPage(array &$parameters)
+		{
+			$pageClass = "elwood\\usr\\page\\" . Config::getInstance()->getSetting(Config::OPTION_WEBSITE_DEFAULT_PAGE) . "Page";
+			return new $pageClass($parameters);
 		}
 		
 		public function head()

@@ -1,6 +1,6 @@
 <?php
 /**
- Copyright (c) 2012 Patrick Griffin
+ Copyright (c) 2014 Patrick Griffin
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the
@@ -23,6 +23,8 @@
  */
 
 	namespace elwood\database;
+	
+	use Exception;
 	use PDO;
 	use elwood\config\Config;
 	
@@ -51,6 +53,61 @@
 			
 			$this->dsn = "pgsql:" . http_build_query(array_filter($dbSettings), "", ";");
 			$this->pdo = new PDO($this->dsn);
+		}
+		
+		// override
+		public function executeInsert(DataModel $dm, &$query = null)
+		{
+			/** iterates through all tables specified in $dm and inserts all set attributes
+			 *	into the database, as a single transaction (if not already participating in one).
+			 */
+		
+			if (!$alreadyInTransaction = $this->pdo->inTransaction())
+				$this->pdo->beginTransaction();
+		
+			$db = $this;
+			$queries = array();
+			$results = array();
+		
+			try
+			{
+				@array_walk($dm->getTables(), function($table, $key, DataModel $dm) use ($db, $query, &$queries, &$results)
+				{
+					$prep = new DbQueryPreper("INSERT INTO " . $table . " (");
+					$prep->addSql(implode(",", $dm->getAttributeKeys($table, true)) . ") VALUES (");
+					$prep->addVariables(array_values($dm->getAttributes($table)));
+					$prep->addSql(")");
+					
+					if (count($dm->getInsertReturns()) > 0)
+						$prep->addSql(" RETURNING " . implode(",", $dm->getInsertReturns()));
+		
+					if (isset($query))
+					{
+						$arr = explode("\n", $query);
+						$query = implode("\n", explode("\n", $query));
+					}
+		
+					if (isset($query))
+						$queries[] = $prep->getQueryDebug();
+		
+					$results = array_merge($results, $db->executeQuery($prep));
+				}, $dm);
+		
+				if (!$alreadyInTransaction)
+					$this->pdo->commit();
+			}
+			catch (Exception $ex)
+			{
+				if (!$alreadyInTransaction)
+					$this->pdo->rollBack();
+		
+				throw $ex;
+			}
+		
+			if (isset($query))
+				$query = implode("\n", $queries);
+			
+			return $results;
 		}
 	}
 ?>

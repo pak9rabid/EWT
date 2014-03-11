@@ -1,6 +1,6 @@
 <?php
 /**
- Copyright (c) 2012 Patrick Griffin
+ Copyright (c) 2014 Patrick Griffin
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the
@@ -52,13 +52,17 @@
 			// the MySQL PDO implementation throws a fit when $stmt->fetchAll()
 			// is called on any prepared statement that isn't a select, so we'll
 			// work around it
-			if ($this->config->getSetting(Config::OPTION_DB_DEBUG) === "true")
+			if ($this->config->getSetting(Config::OPTION_DB_DEBUG))
 				Log::writeInfo("Query: " . $prep->getQueryDebug());
 			
 			try
 			{
 				$stmt = $this->pdo->prepare($prep->getQuery());
-				$stmt->execute($prep->getBindVars());
+				
+				foreach ($prep->getBindVars() as $key => $bindParam)
+					$stmt->bindParam($key + 1, $bindParam->value, $bindParam->type);
+				
+				$stmt->execute();
 			}
 			catch (Exception $ex)
 			{

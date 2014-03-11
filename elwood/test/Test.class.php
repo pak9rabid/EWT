@@ -1,6 +1,6 @@
 <?php
 /**
- *	Copyright (c) 2012 Patrick Griffin - All rights reserved
+ *	Copyright (c) 2014 Patrick Griffin - All rights reserved
  */
 
 	namespace elwood\test;

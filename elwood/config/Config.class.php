@@ -1,6 +1,6 @@
 <?php
 /**
- Copyright (c) 2012 Patrick Griffin
+ Copyright (c) 2014 Patrick Griffin
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the
@@ -44,7 +44,7 @@
 		 * 
 		 * @var string
 		 */
-		const CONFIG_FILE = "ewt.cfg";
+		const CONFIG_FILE = "ewt.ini";
 		
 		/**
 		 * APC_CACHE_CONFIG_KEY
@@ -54,6 +54,44 @@
 		 * @var string
 		 */
 		const APC_CACHE_CONFIG_KEY = "EWT_CONFIG";
+		
+		/** config file sections */
+		
+		/**
+		 * SECTION_DATABASE
+		 * 
+		 * The database configuration section
+		 * 
+		 * @var string
+		 */
+		const SECTION_DATABASE = "database";
+		
+		/**
+		 * SECTION_WEBSITE
+		 * 
+		 * The website configuration section
+		 * 
+		 * @var string
+		 */
+		const SECTION_WEBSITE = "website";
+		
+		/**
+		 * SECTION_LOGGING
+		 * 
+		 * The logging configuration section
+		 * 
+		 * @var string
+		 */
+		const SECTION_LOGGING = "logging";
+		
+		/**
+		 * SECTION_CUSTOM
+		 * 
+		 * The custom configuration section
+		 * 
+		 * @var string
+		 */
+		const SECTION_CUSTOM = "custom";
 		
 		/** config file options */
 		
@@ -128,6 +166,15 @@
 		 * @var string
 		 */
 		const OPTION_WEBSITE_TEMPLATE = "website.template";
+		
+		/**
+		 * OPTION_WEBSITE_DEFAULT_PAGE
+		 * 
+		 * Convenience constant for the configuration option 'website.default_page'
+		 * 
+		 * @var string
+		 */
+		const OPTION_WEBSITE_DEFAULT_PAGE = "website.default_page";
 		
 		/**
 		 * OPTION_LOG_ENABLED
@@ -211,22 +258,29 @@
 		{
 			return array
 			(
-				/** database options */
-				self::OPTION_DB_TYPE => "",
-				self::OPTION_DB_HOST => "",
-				self::OPTION_DB_PORT => "",
-				self::OPTION_DB_DATABASE => "",
-				self::OPTION_DB_USERNAME => "",
-				self::OPTION_DB_PASSWORD => "",
-				self::OPTION_DB_DEBUG => "false",
-				
-				/** website options */
-				self::OPTION_WEBSITE_TEMPLATE => "default.php",
-				
-				/** logging options */
-				self::OPTION_LOG_ENABLED => "true",
-				self::OPTION_LOG_TYPE => "rotating",
-				self::OPTION_LOG_PATH => "logs"
+				self::SECTION_DATABASE => array
+				(
+					self::OPTION_DB_TYPE => "",
+					self::OPTION_DB_HOST => "",
+					self::OPTION_DB_PORT => "",
+					self::OPTION_DB_DATABASE => "",
+					self::OPTION_DB_USERNAME => "",
+					self::OPTION_DB_PASSWORD => "",
+					self::OPTION_DB_DEBUG => false
+				),
+					
+				self::SECTION_WEBSITE => array
+				(
+					self::OPTION_WEBSITE_TEMPLATE => "default.php",
+					self::OPTION_WEBSITE_DEFAULT_PAGE => "Default"
+				),
+					
+				self::SECTION_LOGGING => array
+				(
+					self::OPTION_LOG_ENABLED => true,
+					self::OPTION_LOG_TYPE => "rotating",
+					self::OPTION_LOG_PATH => "logs"
+				)
 			);
 		}
 		
@@ -240,28 +294,38 @@
 		 * 
 		 * @throws Exception If the EWT configuration file doesn't exist or is not readable
 		 */
-		private static function readConfigFile()
+		private static function parseConfig()
 		{
 			$configFile = self::configFilePath();
+						
+			if (($userConfig = parse_ini_file($configFile, true)) === false)
+				throw new Exception("Unable to parse EWT configuration file: " . $configFile);
 			
-			if (!is_readable($configFile))
-				throw new Exception("The EWT config file ($configFile) does not exist or is not readable");
+			return array_replace_recursive(self::defaultConfig(), $userConfig);
+		}
+		
+		private static function configKeyToSection($key)
+		{
+			$keySegemnts = explode(".", $key);
 			
-			$config = self::defaultConfig();
+			if (count($keySegemnts) < 2)
+				return self::SECTION_CUSTOM;
 			
-			foreach (file($configFile) as $line)
+			$prefix = reset($keySegemnts);
+			
+			switch ($prefix)
 			{
-				$line = trim($line);
-				
-				if (empty($line) || preg_match("/^(#|;)/", $line))
-					/** line is empty or commented out...skip */
-					continue;
-				
-				@list($key, $value) = explode("=", $line, 2);
-				$config[trim($key)] = trim($value);
+				case "db":
+					return self::SECTION_DATABASE;
+					
+				case "website":
+					return self::SECTION_WEBSITE;
+					
+				case "log":
+					return self::SECTION_LOGGING;
 			}
 			
-			return $config;
+			return self::SECTION_CUSTOM;
 		}
 		
 		/**
@@ -273,7 +337,7 @@
 		 */
 		private function __construct()
 		{
-			$this->config = self::readConfigFile();
+			$this->config = self::parseConfig();
 			$this->checksum = sha1_file(self::configFilePath());
 		}
 		
@@ -295,11 +359,18 @@
 		 * Gets the specified configuration setting
 		 * 
 		 * @param string $key The configuration setting to get
+		 * @param string $section Optional. Use the specified $section instead of determining it automatically
 		 * @return string A configuration setting, or null if the specified setting does not exist
 		 */
-		public function getSetting($key)
+		public function getSetting($key, $section = null)
 		{
-			return isset($this->config[$key]) ? $this->config[$key] : null;
+			$section = empty($section)
+							? self::configKeyToSection($key)
+							: $section;
+			
+			return isset($this->config[$section][$key])
+						? $this->config[$section][$key]
+						: null;
 		}
 		
 		/**

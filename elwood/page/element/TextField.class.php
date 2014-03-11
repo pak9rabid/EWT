@@ -1,6 +1,6 @@
 <?php
 /**
- Copyright (c) 2012 Patrick Griffin
+ Copyright (c) 2014 Patrick Griffin
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the
@@ -29,7 +29,9 @@
 		public function __construct($name = "", $value = "")
 		{
 			$this->setName($name);
-			$this->setValue($value);
+			
+			if (!empty($value))
+				$this->setValue($value);
 			
 			$this->addClass("elwoodInput");
 			$this->addClass("textfield");
@@ -41,6 +43,12 @@
 		public function content()
 		{			
 			return "<input " . $this->attributesOut() . ">";
+		}
+		
+		// Override
+		public function isValid($input)
+		{
+			return true;
 		}
 	}
 ?>

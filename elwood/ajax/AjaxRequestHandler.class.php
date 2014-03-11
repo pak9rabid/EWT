@@ -1,6 +1,6 @@
 <?php
 /**
- Copyright (c) 2012 Patrick Griffin
+ Copyright (c) 2014 Patrick Griffin
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the
@@ -83,7 +83,7 @@
 				if (empty($requestHandler))
 					throw new Exception("No ajax request handler specified");
 				
-				$requestHandlerClass = "elwood\\ajax\\" . $requestHandler . "AjaxRequestHandler";
+				$requestHandlerClass = "elwood\\usr\\ajax\\" . $requestHandler . "AjaxRequestHandler";
 				$requestHandlerObj = new $requestHandlerClass($parameters);
 				
 				if (!($requestHandlerObj instanceof AjaxRequestHandler))
@@ -94,15 +94,11 @@
 				
 				$response = $requestHandlerObj->processRequest();
 				
-				if (!($response instanceof AjaxResponse))
-					throw new Exception("The specified ajax request handler ($requestHandler) did not return a valid ajax response");
-				
-				return $response;
+				return new AjaxResponse($response);
 			}
 			catch (Exception $ex)
 			{
-				$response = new AjaxResponse("", array("Exception: " . $ex->getMessage()));
-				return $response;
+				return new AjaxResponse("", array($ex->getMessage()));
 			}
 		}
 		
