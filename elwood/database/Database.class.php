@@ -162,6 +162,11 @@
 			return true;
 		}
 		
+		public static function hasOuterJoinIndicator($attribute)
+		{
+			return $attribute != "" && substr($attribute, -strlen(DataModel::OUTER_JOIN_INDICATOR)) == DataModel::OUTER_JOIN_INDICATOR;
+		}
+		
 		/**
 		 * Generates a prepared WHERE clause
 		 * 
@@ -173,17 +178,17 @@
 		 * @param string $table Optional.  If specified, the generated WHERE clause will be limited to the specified table's attributes
 		 * @return string SQL containing the prepared WHERE clause
 		 */
-		public function dataModelToParamaterizedWhereClause(DataModel $dm, DbQueryPreper $prep = null, $table = "")
+		public static function dataModelToParamaterizedWhereClause(DataModel $dm, DbQueryPreper $prep = null, $table = "")
 		{
 			$conditions = array();
 			$likeConditions = array();
 			$conditionValues = array();
 			$likeConditionValues = array();
-			
+				
 			foreach ($dm->getAttributes($table) as $attribute => $value)
 			{
 				$comparator = $dm->getComparator($attribute);
-			
+					
 				if (in_array($comparator, array("=", "!=", ">", "<", ">=", "<=")))
 				{
 					$conditions[] = "$attribute $comparator ?";
@@ -192,29 +197,29 @@
 				else
 				{
 					$likeConditions[] = !$dm->isCaseSensitive() ? "UPPER($attribute) LIKE UPPER(?)" : "$attribute LIKE ?";
-			
+						
 					switch ($comparator)
 					{
 						case "*?*":
 							$likeConditionValues[] = "%" . $value . "%";
 							break;
-			
+								
 						case "*?":
 							$likeConditionValues[] = "%" . $value;
 							break;
-			
+								
 						case "?*":
 							$likeConditionValues[] = $value . "%";
 					}
 				}
 			}
-			
-			$conditions = array_merge(empty($table) ? $dm->getTableRelationships() : array(), $conditions, $likeConditions);
+						
+			$conditions = array_merge($conditions, $likeConditions);
 			
 			if (empty($conditions))
 				return "";
 			
-			$sql = " WHERE " . implode(" AND ", $conditions);
+			$sql = "WHERE " . implode(" AND ", $conditions);
 			
 			if ($prep != null)
 			{
@@ -223,6 +228,47 @@
 			}
 			
 			return $sql;
+		}
+		
+		public static function dataModelToJoinClause(DataModel $dm)
+		{
+			$tableRelationships = $dm->getTableRelationships();
+			
+			if (empty($tableRelationships))
+				return implode(",", $dm->getTables());
+			
+			$includeLeftAndRightTables = true;
+			
+			return implode(" ", array_map(function($tableRelationship) use (&$includeLeftAndRightTables)
+			{
+				list($left, $right) = explode("=", $tableRelationship);
+				
+				$left = trim($left);
+				$right = trim($right);
+				
+				list($leftTable, $leftAttr) = explode(".", $left);
+				list($rightTable, $rightAttr) = explode(".", $right);
+				
+				$joinType = !Database::hasOuterJoinIndicator($leftAttr) && !Database::hasOuterJoinIndicator($rightAttr)
+								? "INNER JOIN"
+								: (Database::hasOuterJoinIndicator($leftAttr) && Database::hasOuterJoinIndicator($rightAttr)
+									? "FULL OUTER JOIN"
+									: (Database::hasOuterJoinIndicator($leftAttr)
+										? "LEFT OUTER JOIN"
+										: "RIGHT OUTER JOIN"));
+				
+				$joinStatement = array();
+				
+				if ($includeLeftAndRightTables)
+				{
+					$joinStatement[] = $leftTable;
+					$includeLeftAndRightTables = false;
+				}
+				
+				$regex = "/\\" . DataModel::OUTER_JOIN_INDICATOR . "$/";
+				return implode(" ", array_merge($joinStatement, array($joinType, $rightTable, "ON", preg_replace($regex, "", $left), "=", preg_replace($regex, "", $right))));
+				
+			}, $tableRelationships));
 		}
 		
 		/**
@@ -312,20 +358,20 @@
 		public function executeSelect(DataModel $dm, &$query = null)
 		{
 			$tables = $dm->getTables();
-			
+				
 			if (empty($tables))
 				throw new Exception("No table(s) specified");
-			
+				
 			$selects = $dm->getSelects();
-			
+						
 			$prep = new DbQueryPreper("SELECT " . (empty($selects) ? "*" : implode(", ", array_map(function($select)
 			{
 				return $select . " AS \"" . $select . "\"";
-			}, $selects))) . " FROM " . implode(", ", $tables));
+			}, $selects))) . " FROM " . static::dataModelToJoinClause($dm) . " ");
 			
-			$this->dataModelToParamaterizedWhereClause($dm, $prep);
+			static::dataModelToParamaterizedWhereClause($dm, $prep);
 			$order = $dm->getOrder();
-			
+				
 			if (!empty($order))
 			{
 				$prep->addSql(" ORDER BY " . implode(", ", array_map(function($attribute, $direction)
@@ -333,16 +379,16 @@
 					return $attribute . " " . $direction;
 				}, array_keys($order), $order)));
 			}
-			
+				
 			if ($dm->getLimit() != 0)
 				$prep->addSql(" LIMIT ")->addVariable($dm->getLimit());
-			
+				
 			if ($dm->getOffset() != 0)
 				$prep->addSql(" OFFSET ")->addVariable($dm->getOffset());
-			
+				
 			if (isset($query))
 				$query = $prep->getQueryDebug();
-			
+				
 			return $this->executeQuery($prep);
 		}
 		
@@ -354,6 +400,7 @@
 		 * @param DataModel $dm The DataModel object to build the query from
 		 * @param string $query If not null, the generated query will be placed here
 		 * @throws Exception If an error is encountered when executing the query
+		 * @return array An empty array
 		 */
 		public function executeInsert(DataModel $dm, &$query = null)
 		{
@@ -401,6 +448,8 @@
 			
 			if (isset($query))
 				$query = implode("\n", $queries);
+			
+			return array();
 		}
 		
 		/**
@@ -411,6 +460,7 @@
 		 * @param DataModel $dm The DataModel object to build the query from
 		 * @param string $query If not null, the generated query will be placed here
 		 * @throws Exception If an error is encountered when executing the query
+		 * @return @return array An empty array
 		 */
 		public function executeUpdate(DataModel $dm, &$query = null)
 		{
@@ -436,7 +486,7 @@
 						$prep = new DbQueryPreper("UPDATE " . $table . " SET " . implode(", ", array_map(function($attribute, $value)
 						{
 							return "$attribute = ?";
-						}, array_keys($updates), $updates)));
+						}, array_keys($updates), $updates)) . " ");
 						
 						$prep->addVariablesNoPlaceholder(array_values($dm->getUpdates($table)));
 						$db->dataModelToParamaterizedWhereClause($dm, $prep, $table);
@@ -461,6 +511,8 @@
 			
 			if (isset($query))
 				$query = implode("\n", $queries);
+			
+			return array();
 		}
 		
 		/**
@@ -471,6 +523,7 @@
 		 * @param DataModel $dm The DataModel object to build the query from
 		 * @param string $query If not null, the generated query will be placed here
 		 * @throws Exception If an error is encountered when executing the query
+		 * @return array An empty array
 		 */
 		public function executeDelete(DataModel $dm, &$query = null)
 		{
@@ -488,7 +541,7 @@
 			{
 				@array_walk($dm->getTables(), function($table, $key, DataModel $dm) use ($db, $query, &$queries)
 				{
-					$prep = new DbQueryPreper("DELETE FROM " . $table);
+					$prep = new DbQueryPreper("DELETE FROM " . $table . " ");
 					$db->dataModelToParamaterizedWhereClause($dm, $prep, $table);
 					
 					if (isset($query))
@@ -510,6 +563,8 @@
 			
 			if (isset($query))
 				$query = implode("\n", $queries);
+			
+			return array();
 		}
 		
 		/**

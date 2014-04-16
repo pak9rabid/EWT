@@ -28,7 +28,7 @@
 	use Exception;
 
 	/**
-	 * An object representation of a database row
+	 * An object-relational mapping class
 	 * 
 	 * In it's simplest form, a DataModel object is an elaborate hashmap that
 	 * maps column names from one or more database tables to values.  Once its
@@ -46,10 +46,20 @@
 		 * 
 		 * Valid comparators for set attributes.
 		 */
-		const comparators = "=,!=,>=,<=,>,<,*?*,*?,?*";	/** These are used as part of a regular
+		const COMPARATORS = "=,!=,>=,<=,>,<,*?*,*?,?*";	/** These are used as part of a regular
 														 * expression in parseAttribute(), so the
 														 * order that they are specified here matters.
 														 */
+		
+		/**
+		 * Outer-join indicator
+		 * 
+		 * Specifies the outer-join character to use when establishing
+		 * outer-join table relationships.
+		 * 
+		 * @var string
+		 */
+		const OUTER_JOIN_INDICATOR = "*";
 		
 		protected $attributes = array();
 		protected $order = array();
@@ -70,7 +80,7 @@
 		 */
 		public static function isValidComparator($comparator)
 		{
-			return in_array($comparator, explode(",", self::comparators));
+			return in_array($comparator, explode(",", self::COMPARATORS));
 		}
 		
 		/**
@@ -90,7 +100,7 @@
 		public static function parseAttributeName($attributeName)
 		{
 			$parts = explode(".", $attributeName, 2);
-			$attributeName = (object) (count($parts) > 1 ? array("table" => strtolower(trim($parts[0])), "name" => strtolower(trim($parts[1]))) : array("table" => "", "name" => strtolower(trim($parts[0]))));
+			$attributeName = (object) (count($parts) > 1 ? array("table" => trim($parts[0]), "name" => trim($parts[1])) : array("table" => "", "name" => trim($parts[0])));
 			
 			if (!empty($attributeName->table) && !Database::isValidIdentifier($attributeName->table))
 				throw new Exception("Invalid table name specified: " . $attributeName->table);
@@ -121,7 +131,7 @@
 		 */
 		public static function parseAttribute($attributeString)
 		{
-			$parts = preg_split("/(" . preg_replace("/,/", "|", preg_quote(self::comparators)) . ")+/", $attributeString, 2, PREG_SPLIT_NO_EMPTY|PREG_SPLIT_DELIM_CAPTURE);
+			$parts = preg_split("/(" . preg_replace("/,/", "|", preg_quote(self::COMPARATORS)) . ")+/", $attributeString, 2, PREG_SPLIT_NO_EMPTY|PREG_SPLIT_DELIM_CAPTURE);
 			
 			if (count($parts) != 3)
 				throw new Exception("Invalid attribute string specified: " . $attributeString);
@@ -143,9 +153,9 @@
 		 * tables
 		 * 
 		 * @param mixed $tables A list of tables to initialize the DataModel with.
-		 *    This can be an array containing a list of table names, or a
-		 *    variable list of arguments, with each argument being a table
-		 *    name.
+		 * this can be an array containing a list of table names, or a
+		 * variable list of arguments, with each argument being a table
+		 * name.
 		 */
 		public function __construct($tables = "")
 		{
@@ -219,13 +229,17 @@
 		
 		/**
 		 * Get the database connection
-		 * 
-		 * Get the database connection set for this instance
-		 * 
-		 * @return Database The database connection, or null if none was set
+	 	 *
+	 	 * Get the database connection set for this instance, or set a new one if
+	 	 * one is not currently set.
+	 	 *
+	 	 * @return Database The database connection
 		 */
 		public function getConnection()
 		{
+			if (empty($this->db))
+				$this->db = Database::getInstance();
+			
 			return $this->db;
 		}
 		
@@ -248,10 +262,26 @@
 			if (!Database::isValidIdentifier($table))
 				throw new Exception("Invalid table name specified: " . $table);
 			
-			$this->attributes[strtolower($table)] = array();
+			$this->attributes[$table] = array();
 			return $this;
 		}
 		
+		/**
+		 * Alias for setTable()
+		 * 
+		 * This is a convenience method to the setTable() method that would
+		 * typically be used for UPDATE operations.  See setTable() for more
+		 * information.
+		 * 
+		 * @param string $table
+		 * @throws Exception If an invalid table name is specified
+		 * @return DataModel $this (for method chaining)
+		 */
+		public function update($table)
+		{
+			return $this->setTable($table);
+		}
+				
 		/**
 		 * Set and initialize a list of tables
 		 * 
@@ -286,7 +316,7 @@
 			
 			return $this;
 		}
-		
+				
 		/**
 		 * Remove a table
 		 * 
@@ -298,7 +328,7 @@
 		 */
 		public function removeTable($table)
 		{
-			unset($this->attributes[strtolower($table)]);
+			unset($this->attributes[$table]);
 			
 			$this->tableRelationships = array_filter($this->tableRelationships, function($relationship) use ($table)
 			{
@@ -374,14 +404,14 @@
 		 * Sets the sort order, clearing any previously set ordering.
 		 * 
 		 * @param mixed $orders A list of attributes and sort directions to
-		 *    order the results when executeSelect() is called.  This can be
-		 *    an array containing a list of sort orders, or a variable list of
-		 *    arguments, with each argument being a sort order.  Sort orders
-		 *    are expected to be in the format:<br><br>
+		 * order the results when executeSelect() is called.  This can be
+		 * an array containing a list of sort orders, or a variable list of
+		 * arguments, with each argument being a sort order.  Sort orders
+		 * are expected to be in the format:<br><br>
 		 *    
-		 *       attributeName [direction]<br><br>
+		 *      attributeName [direction]<br><br>
 		 *       
-		 *    If ommitted, a direction of 'ASC' is assumed.
+		 * If ommitted, a direction of 'ASC' is assumed.
 		 * @throws Exception If an invalid order direction is specified
 		 * @return DataModel $this (for method chaining)
 		 */
@@ -408,6 +438,32 @@
 			}
 		
 			return $this;
+		}
+		
+		/**
+		 * Alias for setOrder()
+		 * 
+		 * This is a convenience method alias for setOrder().  See the setOrder()
+		 * method for more information.
+		 * 
+		  * @param mixed $orders A list of attributes and sort directions to
+		 * order the results when executeSelect() is called.  This can be
+		 * an array containing a list of sort orders, or a variable list of
+		 * arguments, with each argument being a sort order.  Sort orders
+		 * are expected to be in the format:<br><br>
+		 *    
+		 *      attributeName [direction]<br><br>
+		 *       
+		 * If ommitted, a direction of 'ASC' is assumed.
+		 * @throws Exception If an invalid order direction is specified
+		 * @return DataModel $this (for method chaining)
+		 */
+		public function orderBy($orders)
+		{
+			if (!is_array($orders))
+				$orders = func_get_args();
+			
+			return $this->setOrder($orders);
 		}
 		
 		/**
@@ -577,10 +633,10 @@
 		 * Sets a list of attributes at once.
 		 * 
 		 * @param mixed $attributes A list of attributes to set.  This can be 
-		 *    an array containing a list of attributes, or a variable list of
-		 *    arguments, wich each argument being an attribute string.  See
-		 *    setAttribute() for details on how the attribute string should be
-		 *    formatted.
+		 * an array containing a list of attributes, or a variable list of
+		 * arguments, wich each argument being an attribute string.  See
+		 * setAttribute() for details on how the attribute string should be
+		 * formatted.
 		 * @return DataModel $this (for method chaining)
 		 */
 		public function setAttributes($attributes)
@@ -607,6 +663,48 @@
 		}
 		
 		/**
+		 * Alias for setAttributes()
+		 * 
+		 * Convenience method alias to setAttributes() to be used for queries
+		 * containing a WHERE clause.  See setAttributes() for more information.
+		 * 
+		 * @param mixed $conditions A list of conditions to set.  This can be 
+		 * an array containing a list of conditions, or a variable list of
+		 * arguments, wich each argument being an attribute string.  See
+		 * setAttribute() for details on how the attribute string should be
+		 * formatted.
+		 * @return DataModel $this (for method chaining)
+		 */
+		public function where($conditions)
+		{
+			if (!is_array($conditions))
+				$conditions = func_get_args();
+			
+			return $this->setAttributes($conditions);
+		}
+		
+		/**
+		 * Alias for setAttributes()
+		 * 
+		 * Convenience method alias to setAttributes() to be used for INSERT
+		 * queries.  See setAttributes() for more information.
+		 * 
+		 * @param mixed $attributes A list of attributes to set.  This can be 
+		 * an array containing a list of attributes, or a variable list of
+		 * arguments, wich each argument being an attribute string.  See
+		 * setAttribute() for details on how the attribute string should be
+		 * formatted.
+		 * @return DataModel $this (for method chaining)
+		 */
+		public function insert($attributes)
+		{
+			if (!is_array($attributes))
+				$attributes = func_get_args();
+			
+			return $this->setAttributes($attributes);
+		}
+		
+		/**
 		 * Remove a set attribute
 		 * 
 		 * Removes the specified attribute from the list of attributes
@@ -621,6 +719,7 @@
 			unset($this->attributes[$attribute->table][$attribute->name]);
 			return $this;
 		}
+		
 		/**
 		 * Clear attributes
 		 * 
@@ -635,9 +734,7 @@
 		public function clearAttributes($table = "")
 		{
 			if (!empty($table))
-			{
-				$table = strtolower($table);
-				
+			{	
 				if (!isset($this->attributes[$table]))
 					return;
 
@@ -725,13 +822,7 @@
 		 */
 		public function executeSelect(&$query = null)
 		{
-			if (!empty($this->db))
-				return $this->db->executeSelect($this, $query);
-			else
-			{
-				$db = Database::getInstance();
-				return $db->executeSelect($this, $query);
-			}
+			return $this->getConnection()->executeSelect($this, $query);
 		}
 
 		/**
@@ -747,13 +838,7 @@
 		 */
 		public function executeInsert(&$query = null)
 		{
-			if (!empty($this->db))
-				return $this->db->executeInsert($this, $query);
-			else
-			{
-				$db = Database::getInstance();
-				return $db->executeInsert($this, $query);
-			}
+			return $this->getConnection()->executeInsert($this, $query);
 		}
 		
 		/**
@@ -770,16 +855,7 @@
 		 */
 		public function executeUpdate(&$query = null)
 		{
-			if (!empty($this->db))
-				$this->db->executeUpdate($this, $query);
-			else
-			{
-				$db = Database::getInstance();
-				$db->executeUpdate($this, $query);
-			}
-			
-			// FIXED: return $this
-			return $this;
+			return $this->getConnection()->executeUpdate($this, $query);
 		}
 
 		/**
@@ -794,17 +870,8 @@
 		 * @return DataModel $this (for method chaining)
 		 */
 		public function executeDelete(&$query = null)
-		{			
-			if (!empty($this->db))
-				$this->db->executeDelete($this, $query);
-			else
-			{
-				$db = Database::getInstance();
-				$db->executeDelete($this, $query);
-			}
-			
-			// FIXED: return $this
-			return $this;
+		{
+			return $this->getConnection()->executeDelete($this, $query);
 		}
 		
 		/**
@@ -815,7 +882,7 @@
 		 * @param string $attributeName Attribute to set the comparator on.  If
 		 *    the specified attribute does not exist, no changes are made.
 		 * @param string $comparator The comparator to set.  For a list of
-		 *    valid comparators, see the DataModel::comparators constant.
+		 *    valid comparators, see the DataModel::COMPARATORS constant.
 		 */
 		public function setComparator($attributeName, $comparator)
 		{
@@ -869,9 +936,7 @@
 			};
 			
 			if (!empty($table))
-			{
-				$table = strtolower($table);
-				
+			{				
 				if (!isset($this->attributes[$table]))
 					return array();
 				
@@ -920,9 +985,7 @@
 			};
 			
 			if (!empty($table))
-			{
-				$table = strtolower($table);
-				
+			{	
 				if (!isset($this->attributes[$table]))
 					return $this;
 				
@@ -937,7 +1000,7 @@
 		/**
 		 * Set a table relationship
 		 * 
-		 * Sets a relationship for the purpose of performing an SQL INNER JOIN
+		 * Sets a relationship for the purpose of performing an SQL join
 		 * between two tables.
 		 * 
 		 * @param string $relationship The table relationship, in the form:
@@ -948,39 +1011,54 @@
 		public function setTableRelationship($relationship)
 		{
 			list($left, $right) = explode("=", $relationship, 2);
+			
+			$left = trim($left);
+			$right = trim($right);
+			
 			list($leftTable, $leftAttr) = explode(".", $left, 2);
 			list($rightTable, $rightAttr) = explode(".", $right, 2);
+			
 			$a = array(&$leftTable, &$leftAttr, &$rightTable, &$rightAttr);
 			
-			array_walk($a, function(&$val, $key, $relationship)
+			foreach (array(&$leftTable, &$rightTable) as $table)
 			{
-				$val = trim(strtolower($val));
-			
-				if (!Database::isValidIdentifier($val))
+				$table = trim($table);
+				
+				if (!Database::isValidIdentifier($table))
 					throw new Exception("Invalid table relationship specified: " . $relationship);
-			}, $relationship);
+			}
 			
+			foreach (array(&$leftAttr, &$rightAttr) as $attributeName)
+			{
+				$attributeName = trim($attributeName);
+				
+				$regex = "/\\" . self::OUTER_JOIN_INDICATOR . "$/";
+				
+				if (!Database::isValidIdentifier(preg_replace($regex, "", $attributeName)))
+					throw new Exception("Invalid table relationship specified: " . $relationship);
+			}
+				
 			if (!in_array($leftTable, $this->getTables()))
 				$this->setTable($leftTable);
-			
+				
 			if (!in_array($rightTable, $this->getTables()))
 				$this->setTable($rightTable);
-		
+			
 			$left = $leftTable . "." . $leftAttr;
 			$right = $rightTable . "." . $rightAttr;
-		
+			
 			$result = strcmp($left, $right);
-		
+			
 			if ($result > 0)
-			// $left > $right
+				// $left > $right
 				$relationship = $right . " = " . $left;
 			else
-			// $left < $right, or $left == $right
+				// $left < $right, or $left == $right
 				$relationship = $left . " = " . $right;
-		
+			
 			if (!in_array($relationship, $this->getTableRelationships()))
 				$this->tableRelationships[] = $relationship;
-		
+			
 			return $this;
 		}
 		
@@ -991,9 +1069,9 @@
 		 * an SQL INNER JOIN between two or more tables.
 		 * 
 		 * @param mixed $relationships A list of relationships to set.  This
-		 *    be in the form of an array, or a variable list of relationship
-		 *    parameters.  See the setTableRelationships($relationship) method
-		 *    for how a relationsihp should be specified.
+		 * can be in the form of an array, or a variable list of relationship
+		 * parameters.  See the setTableRelationships($relationship) method
+		 * for how a relationsihp should be specified.
 		 *    
 		 * @throws Exception
 		 * @return DataModel $this (for method chaining)
@@ -1018,6 +1096,26 @@
 			}
 			
 			return $this;
+		}
+		
+		/**
+		 * Alias to setTableRelationships()
+		 * 
+		 * Convenience method alias for setTableRelationships().  See
+		 * setTableRelationships() for more information.
+		 * 
+		 * @param mixed $relationships A list of relationships to set.  This
+		 * can be in the form of an array, or a variable list of relationship
+		 * parameters.  See the setTableRelationships($relationship) method
+		 * for how a relationsihp should be specified.
+		 * @return DataModel $this (for method chaining)
+		 */
+		public function joinOn($tableRelationships)
+		{
+			if (!is_array($tableRelationships))
+				$tableRelationships = func_get_args($tableRelationships);
+			
+			return $this->setTableRelationships($tableRelationships);
 		}
 		
 		/**
@@ -1139,6 +1237,14 @@
 			return $this;
 		}
 		
+		public function select($selects)
+		{
+			if (!is_array($selects))
+				$selects = func_get_args();
+			
+			return $this->setSelects($selects);
+		}
+		
 		/**
 		 * Get select attributes
 		 * 
@@ -1174,7 +1280,6 @@
 		 * @throws Exception If the specified $attributeName is invalid
 		 * @return DataModel $this (for method chaining)
 		 */
-		
 		public function addInsertReturn($attributeName)
 		{
 			$attribute = self::parseAttributeName($attributeName);
@@ -1281,9 +1386,6 @@
 			return $this;
 		}
 		
-		
-		
-		
 		/**
 		 * Set an udpate attribute
 		 * 
@@ -1340,6 +1442,24 @@
 			}
 		
 			return $this;
+		}
+		
+		/**
+		 * Alias of setUpdates()
+		 * 
+		 * Convenience alias method for setUpdates() when making INSERT queries.
+		 * See setUpdates() for more information.
+		 * 
+		 * @param mixed $updates This can be either an array containing a list
+		 * of updates, or a variable list of update parameters.
+		 * @return DataModel $this (for method chaining)
+		 */
+		public function set($updates)
+		{
+			if (!is_array($updates))
+				$updates = func_get_args();
+			
+			return $this->setUpdates($updates);
 		}
 		
 		/**
@@ -1556,11 +1676,11 @@
 				if (!Database::isValidIdentifier($table))
 					throw new Exception("The table specified is invalid: " . $table);
 				
-				if (!$ignoreMissing && !isset($this->attributes[strtolower($table)]))
+				if (!$ignoreMissing && !isset($this->attributes[$table]))
 					throw new Exception("The table specified does not exist: " . $table);
 			}
 		
-			return strtolower($table);
+			return $table;
 		}
 	}
 ?>

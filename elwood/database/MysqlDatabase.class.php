@@ -29,10 +29,31 @@
 	use elwood\config\Config;
 	use elwood\log\Log;
 	
+	/**
+	 * A connection to a MySQL database
+	 * 
+	 * The implementing class for accessing a MySQL database.
+	 * 
+	 * @author pgriffin
+	 */
 	class MysqlDatabase extends Database
 	{
+		/**
+		 * Default MySQL TCP port
+		 * 
+		 * The default TCP port for MySQL network connections.
+		 * 
+		 * @var int
+		 */
 		const DEFAULT_PORT = 3306;
 		
+		/**
+		 * Constructor
+		 * 
+		 * Creates a connection to a MySQL database.
+		 * 
+		 * @param Config $config An EWT configuration object.
+		 */
 		public function __construct(Config $config)
 		{
 			parent::__construct($config);
@@ -43,7 +64,17 @@
 			$this->pdo = new PDO($this->dsn, $config->getSetting(Config::OPTION_DB_USERNAME), $config->getSetting(Config::OPTION_DB_PASSWORD), array(PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8"));
 		}
 		
-		// Override
+		/**
+		 * Execute a prepared SQL query
+		 * 
+		 * Executes $prep as a prepared SQL statement, binding any set variables
+		 * during query execution
+		 * 
+		 * @param DbQueryPreper $prep The prepared SQL query
+		 * @param boolean $getNumRowsAffected If set to true, will return a count of the rows affected by the executed query
+		 * @throws SQLException If execution of the query fails
+		 * @return int|array A count of affected rows if $getNumRowsAffected is true, otherwise an array of DataModel objects representing the result set of the query
+		 */
 		public function executeQuery(DbQueryPreper $prep, $getNumRowsAffected = false)
 		{
 			if (preg_match("/^SELECT/i", $prep->getQuery()))
@@ -74,7 +105,16 @@
 			}
 		}
 		
-		// Override
+		/**
+		 * Executes a SELECT database query
+		 * 
+		 * Generates and executes a SELECT database query based on properties set in $dm
+		 * 
+		 * @param DataModel $dm The DataModel object to build the query from
+		 * @param string $query If not null, the generated query will be placed here
+		 * @throws Exception If $dm has no tables set
+		 * @return array An array of DataModel objects representing the result set of the query
+		 */
 		public function executeSelect(DataModel $dm, &$query = null)
 		{
 			$offset = $dm->getOffset();

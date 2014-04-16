@@ -35,7 +35,7 @@
 	 * @author Patrick Griffin <pak9rabid@yahoo.com>
 	 */
 	
-	final class Config
+	class Config
 	{
 		/**
 		 * CONFIG_FILE
@@ -150,6 +150,15 @@
 		const OPTION_DB_PASSWORD = "db.password";
 		
 		/**
+		 * OPTION_DB_PERSISTENT_CONNECTIONS
+		 * 
+		 * Convenience constant for the configuration option 'db.persistent_connections'
+		 * 
+		 * @var string
+		 */
+		const OPTION_DB_PERSISTENT_CONNECTIONS = "db.persistent_connections";
+		
+		/**
 		 * OPTION_DB_DEBUG
 		 *
 		 * Convenience constant for the configuration option 'db.debug'
@@ -203,8 +212,8 @@
 		 */
 		const OPTION_LOG_PATH = "log.path";
 		
-		private $config;
-		private $checksum;
+		protected $config;
+		protected $checksum;
 		
 		/**
 		 * Get Config instance
@@ -222,17 +231,22 @@
 				if (apc_exists(self::APC_CACHE_CONFIG_KEY))
 				{
 					$config = apc_fetch(self::APC_CACHE_CONFIG_KEY);
-		
-					if ($config->getChecksum() == sha1_file(self::configFilePath()))
+					
+					if (!$config->hasConfigChanged())
 						return $config;
 				}
 				
-				$config = new Config();
+				$config = new static();
 				apc_store(self::APC_CACHE_CONFIG_KEY, $config);
 				return $config;
 			}
 		
-			return new Config();
+			return new static();
+		}
+		
+		public static function configDir()
+		{
+			return implode(DIRECTORY_SEPARATOR, array(__DIR__, "..", ".."));
 		}
 		
 		/**
@@ -243,8 +257,8 @@
 		 * @return string Path to the EWT configuration file
 		 */
 		public static function configFilePath()
-		{		
-			return implode(DIRECTORY_SEPARATOR, array(__DIR__, "..", "..", self::CONFIG_FILE));
+		{
+			return static::configDir() . DIRECTORY_SEPARATOR . static::CONFIG_FILE;
 		}
 		
 		/**
@@ -254,7 +268,7 @@
 		 * 
 		 * @return array Default configuration settings
 		 */
-		private static function defaultConfig()
+		protected static function defaultConfig()
 		{
 			return array
 			(
@@ -294,17 +308,17 @@
 		 * 
 		 * @throws Exception If the EWT configuration file doesn't exist or is not readable
 		 */
-		private static function parseConfig()
+		protected static function parseConfig()
 		{
-			$configFile = self::configFilePath();
+			$configFile = static::configFilePath();
 						
 			if (($userConfig = parse_ini_file($configFile, true)) === false)
 				throw new Exception("Unable to parse EWT configuration file: " . $configFile);
 			
-			return array_replace_recursive(self::defaultConfig(), $userConfig);
+			return array_replace_recursive(static::defaultConfig(), $userConfig);
 		}
 		
-		private static function configKeyToSection($key)
+		protected static function configKeyToSection($key)
 		{
 			$keySegemnts = explode(".", $key);
 			
@@ -335,10 +349,10 @@
 		 * in the EWT configuratino file.  A checksum of the configuration
 		 * file is stored for caching purposes.
 		 */
-		private function __construct()
+		protected function __construct()
 		{
-			$this->config = self::parseConfig();
-			$this->checksum = sha1_file(self::configFilePath());
+			$this->config = static::parseConfig();
+			$this->checksum = sha1_file(static::configFilePath());
 		}
 		
 		/**
@@ -384,6 +398,11 @@
 		public function getChecksum()
 		{
 			return $this->checksum;
+		}
+		
+		public function hasConfigChanged()
+		{
+			return $this->checksum != sha1_file(static::configFilePath());
 		}
 	}
 ?>

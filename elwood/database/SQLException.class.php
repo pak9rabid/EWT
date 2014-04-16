@@ -26,12 +26,33 @@
 	
 	use Exception;
 	
+	/**
+	 * The SQLException class
+	 * 
+	 * An Exception to be thrown when problems arise accessing a database.
+	 * 
+	 * @author pgriffin
+	 */
 	class SQLException extends Exception
 	{
 		protected $query;
 		protected $errorCode;
 		protected $errorMessage;
 		
+		/**
+		 * Constructor
+		 * 
+		 * Creates an SQLException instance.
+		 * 
+		 * @param string $message Optional. A short summary message of the
+		 * exception
+		 * @param string $query Optional. The offending SQL query that caused
+		 * the database error
+		 * @param string $errorCode Optional. The SQLSTATE error code (a five
+		 * characters alphanumeric identifier defined in the ANSI SQL standard)
+		 * @param string $errorMessage Optional. The PDO driver-specific error
+		 * message 
+		 */
 		public function __construct($message = "Error executing SQL query", $query = "", $errorCode = "", $errorMessage = "")
 		{
 			parent::__construct($message);
@@ -40,34 +61,77 @@
 			$this->setErrorMessage($errorMessage);
 		}
 		
+		/**
+		 * Set the query
+		 * 
+		 * Sets the SQL query associated with the exception
+		 * 
+		 * @param string $query The SQL query
+		 */
 		public function setQuery($query)
 		{
 			$this->query = $query;
 		}
 		
+		/**
+		 * Set the error code
+		 * 
+		 * Sets the SQLSTAT error code (a five characters alphanumeric
+		 * identifier defined in the ANSI SQL standard).
+		 * 
+		 * @param string The SQLSTAT error code
+		 */
 		public function setErrorCode($errorCode = "")
 		{
-			if (!empty($errorCode) && !preg_match("/^[0-9A-Z]{5}$/", $errorCode))
-				throw new Exception("Invalid error code");
-			
-			$this->errorCode = $errorCode;
+			$this->errorCode = preg_match("/^[0-9A-Z]{5}$/", $errorCode)
+				? $errorCode
+				: "";
 		}
 		
+		/**
+		 * Set the error message
+		 * 
+		 * Sets the PDO driver-specific error message.
+		 * 
+		 * @param string $errorMessage The PDO driver-specific error message
+		 */
 		public function setErrorMessage($errorMessage = "")
 		{
 			$this->errorMessage = $errorMessage;
 		}
 		
+		/**
+		 * Get the debug query
+		 * 
+		 * Gets the debug query of the offending SQL query.
+		 * 
+		 * @return string The debug SQL query
+		 */
 		public function getQuery()
 		{
 			return $this->query;
 		}
 		
+		/**
+		 * Get the error code
+		 * 
+		 * Gets the SQLSTAT error code (a five characters alphanumeric 
+		 * identifier defined in the ANSI SQL standard)
+		 * 
+		 * @return string The error code
+		 */
 		public function getErrorCode()
 		{
 			return $this->errorCode;
 		}
 		
+		/**
+		 * Get the error message
+		 * 
+		 * Gets the PDO driver-specific error message.
+		 * 
+		 * @return string The error message
+		 */
 		public function getErrorMessage()
 		{
 			return $this->errorMessage;

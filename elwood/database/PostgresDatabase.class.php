@@ -28,10 +28,31 @@
 	use PDO;
 	use elwood\config\Config;
 	
+	/**
+	 * A connection to a PostgreSQL database
+	 *
+	 * The implementing class for accessing a PostgreSQL database.
+	 *
+	 * @author pgriffin
+	 */
 	class PostgresDatabase extends Database
 	{
+		/**
+		 * Default PostgreSQL TCP port
+		 *
+		 * The default TCP port for PostgreSQL network connections.
+		 *
+		 * @var int
+		 */
 		const DEFAULT_PORT = 5432;
 		
+		/**
+		 * Constructor
+		 *
+		 * Creates a connection to a PostgreSQL database.
+		 *
+		 * @param Config $config An EWT configuration object.
+		 */
 		public function __construct(Config $config)
 		{
 			parent::__construct($config);
@@ -55,7 +76,17 @@
 			$this->pdo = new PDO($this->dsn);
 		}
 		
-		// override
+		/**
+		 * Execute an INSERT database query
+		 * 
+		 * Generates and executes an INSERT database query based on the attributes set in $dm
+		 * 
+		 * @param DataModel $dm The DataModel object to build the query from
+		 * @param string $query If not null, the generated query will be placed here
+		 * @throws Exception If an error is encountered when executing the query
+		 * @return array An array of DataModel objects if any insert returns
+		 * are specified, otherwise an empty array
+		 */
 		public function executeInsert(DataModel $dm, &$query = null)
 		{
 			/** iterates through all tables specified in $dm and inserts all set attributes
@@ -107,6 +138,123 @@
 			if (isset($query))
 				$query = implode("\n", $queries);
 			
+			return $results;
+		}
+		
+		/**
+		 * Execute an UPDATE database query
+		 *
+		 * Generates and exectues an UPDATE database query based on the attributes set in $dm
+		 *
+		 * @param DataModel $dm The DataModel object to build the query from
+		 * @param string $query If not null, the generated query will be placed here
+		 * @throws Exception If an error is encountered when executing the query
+		 * @return array An array of DataModel objects if any insert returns
+		 * are specified, otherwise an empty array
+		 */
+		public function executeUpdate(DataModel $dm, &$query = null)
+		{
+			if (!$alreadyInTransaction = $this->pdo->inTransaction())
+				$this->pdo->beginTransaction();
+				
+			$db = $this;
+			$queries = array();
+			$results = array();
+				
+			try
+			{
+				@array_walk($dm->getTables(), function($table, $key, DataModel $dm) use ($db, $query, &$queries, &$results)
+				{
+					$updates = $dm->getUpdates($table, true);
+					$attributes = $dm->getAttributes($table, true);
+						
+					if (!empty($updates))
+					{
+						$prep = new DbQueryPreper("UPDATE " . $table . " SET " . implode(", ", array_map(function($attribute, $value)
+						{
+							return "$attribute = ?";
+						}, array_keys($updates), $updates)) . " ");
+			
+						$prep->addVariablesNoPlaceholder(array_values($dm->getUpdates($table)));
+						$db->dataModelToParamaterizedWhereClause($dm, $prep, $table);
+			
+						if (count($dm->getInsertReturns()) > 0)
+							$prep->addSql(" RETURNING " . implode(",", $dm->getInsertReturns()));
+						
+						if (isset($query))
+							$queries[] = $prep->getQueryDebug();
+			
+						$results = array_merge($results, $db->executeQuery($prep));
+					}
+				}, $dm);
+			
+					if (!$alreadyInTransaction)
+					$this->pdo->commit();
+			}
+			catch (Exception $ex)
+			{
+			if (!$alreadyInTransaction)
+				$this->pdo->rollBack();
+			
+				throw $ex;
+			}
+				
+			if (isset($query))
+				$query = implode("\n", $queries);
+				
+			return $results;
+		}
+		
+		/**
+		 * Execute a DELETE database query
+		 *
+		 * Generates and exectues a DELETE database query based on the attributes set in $dm
+		 *
+		 * @param DataModel $dm The DataModel object to build the query from
+		 * @param string $query If not null, the generated query will be placed here
+		 * @throws Exception If an error is encountered when executing the query
+		 * @return array An array of DataModel objects if any insert returns
+		 * are specified, otherwise an empty array
+		 */
+		public function executeDelete(&$query = null)
+		{
+			if (!$alreadyInTransaction = $this->pdo->inTransaction())
+				$this->pdo->beginTransaction();
+			
+			$db = $this;
+			$queries = array();
+			$results = array();
+				
+			try
+			{
+				@array_walk($dm->getTables(), function($table, $key, DataModel $dm) use ($db, $query, &$queries, &$results)
+				{
+					$prep = new DbQueryPreper("DELETE FROM " . $table . " ");
+					$db->dataModelToParamaterizedWhereClause($dm, $prep, $table);
+					
+					if (count($dm->getInsertReturns()) > 0)
+						$prep->addSql(" RETURNING " . implode(",", $dm->getInsertReturns()));
+					
+					if (isset($query))
+						$queries[] = $prep->getQueryDebug();
+						
+					$results = array_merge($results, $db->executeQuery($prep));
+				}, $dm);
+			
+				if (!$alreadyInTransaction)
+					$this->pdo->commit();
+			}
+			catch (Exception $ex)
+			{
+				if (!$alreadyInTransaction)
+					$this->pdo->rollBack();
+			
+				throw $ex;
+			}
+				
+			if (isset($query))
+				$query = implode("\n", $queries);
+				
 			return $results;
 		}
 	}
