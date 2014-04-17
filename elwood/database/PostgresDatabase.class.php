@@ -72,7 +72,11 @@
 			if (!empty($dbSettings["host"]) && empty($dbSettings["port"]))
 				$dbSettings["port"] = self::DEFAULT_PORT;
 			
-			$this->dsn = "pgsql:" . http_build_query(array_filter($dbSettings), "", ";");
+			$this->dsn = "pgsql:" . implode(";", array_map(function($setting, $value)
+			{
+				return "{$setting}={$value}";
+			}, array_keys($dbSettings = array_filter($dbSettings)), $dbSettings));
+			
 			$this->pdo = new PDO($this->dsn);
 		}
 		
