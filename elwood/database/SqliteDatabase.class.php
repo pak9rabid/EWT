@@ -47,7 +47,7 @@
 		{
 			parent::__construct($config);
 			$this->dsn = "sqlite:" . $config->getSetting(Config::OPTION_DB_DATABASE);
-			$this->pdo = new PDO($this->dsn);
+			$this->pdo = new PDO($this->dsn, null, null, array(PDO::ATTR_PERSISTENT => $config->getSetting(Config::OPTION_DB_PERSISTENT_CONNECTIONS)));
 			$this->pdo->exec("PRAGMA foreign_keys = ON");
 		}
 		

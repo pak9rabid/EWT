@@ -275,6 +275,7 @@
 				self::SECTION_DATABASE => array
 				(
 					self::OPTION_DB_TYPE => "",
+					self::OPTION_DB_PERSISTENT_CONNECTIONS => false,
 					self::OPTION_DB_HOST => "",
 					self::OPTION_DB_PORT => "",
 					self::OPTION_DB_DATABASE => "",

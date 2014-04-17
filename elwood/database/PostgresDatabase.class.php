@@ -77,7 +77,7 @@
 				return "{$setting}={$value}";
 			}, array_keys($dbSettings = array_filter($dbSettings)), $dbSettings));
 			
-			$this->pdo = new PDO($this->dsn);
+			$this->pdo = new PDO($this->dsn, null, null, array(PDO::ATTR_PERSISTENT => $config->getSetting(Config::OPTION_DB_PERSISTENT_CONNECTIONS)));
 		}
 		
 		/**
